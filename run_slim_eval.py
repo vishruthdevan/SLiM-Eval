@@ -11,6 +11,7 @@ import argparse
 import gc
 import json
 import logging
+import threading
 import time
 import warnings
 from datetime import datetime
@@ -26,9 +27,15 @@ import pandas as pd
 import psutil
 import seaborn as sns
 import torch
+import torch.distributed as dist
 
-# Import codecarbon for energy tracking
-from codecarbon import EmissionsTracker
+# Import pynvml for GPU power tracking
+try:
+    import pynvml
+
+    PYNVML_AVAILABLE = True
+except ImportError:
+    PYNVML_AVAILABLE = False
 
 # Import quantization libraries
 from datasets import load_dataset
@@ -133,6 +140,13 @@ class SLiMEvaluator:
     @staticmethod
     def clear_cache():
         """Clear GPU cache and run garbage collection."""
+        # Destroy distributed process group if initialized
+        if dist.is_initialized():
+            try:
+                dist.destroy_process_group()
+            except Exception as e:
+                logger.debug(f"Error destroying process group: {e}")
+
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -140,9 +154,18 @@ class SLiMEvaluator:
 
     @staticmethod
     def get_gpu_memory_mb() -> float:
-        """Get current GPU memory usage in MB."""
+        """Get current GPU memory usage in MB using nvidia-smi."""
         if torch.cuda.is_available():
-            return torch.cuda.memory_allocated() / (1024**2)
+            try:
+                if PYNVML_AVAILABLE:
+                    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                    info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                    return info.used / (1024**2)
+                else:
+                    # Fallback to torch
+                    return torch.cuda.memory_allocated() / (1024**2)
+            except Exception:
+                return torch.cuda.memory_allocated() / (1024**2)
         return 0.0
 
     @staticmethod
@@ -224,10 +247,14 @@ class SLiMEvaluator:
 
             # Load model and tokenizer
             logger.info("Loading model and tokenizer...")
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name, torch_dtype="auto", device_map="auto"
-            )
+            model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
             tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+            # Set pad token if not set (required for proper attention masks)
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+                tokenizer.pad_token_id = tokenizer.eos_token_id
+                logger.info(f"Set pad_token to eos_token: {tokenizer.pad_token}")
 
             # Load and preprocess calibration dataset
             logger.info(f"Loading calibration dataset: {self.args.calibration_dataset}")
@@ -287,11 +314,18 @@ class SLiMEvaluator:
             # Verify with sample generation
             logger.info("Verifying quantized model with sample generation...")
             dispatch_for_generation(model)
-            input_ids = tokenizer("Hello my name is", return_tensors="pt").input_ids.to(
-                model.device
+            inputs = tokenizer(
+                "Hello my name is",
+                return_tensors="pt",
+                padding=True,
+                return_attention_mask=True,
+            ).to(model.device)
+            output = model.generate(
+                **inputs, max_new_tokens=50, pad_token_id=tokenizer.pad_token_id
             )
-            output = model.generate(input_ids, max_new_tokens=50)
-            logger.info(f"Sample output: {tokenizer.decode(output[0])}")
+            logger.info(
+                f"Sample output: {tokenizer.decode(output[0], skip_special_tokens=True)}"
+            )
 
             # Save quantized model
             logger.info(f"Saving to {output_dir}...")
@@ -420,6 +454,25 @@ class SLiMEvaluator:
             f"Warmup: {self.args.num_warmup} | Benchmark: {self.args.num_runs} | Batch: {self.args.batch_size}"
         )
 
+        # Initialize NVML for memory tracking
+        nvml_available = False
+        if PYNVML_AVAILABLE and torch.cuda.is_available():
+            try:
+                pynvml.nvmlInit()
+                nvml_available = True
+            except Exception as e:
+                logger.warning(f"Could not initialize NVML: {e}")
+
+        # Get baseline memory after model load (vLLM's KV cache allocation)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            baseline_memory_mb = self.get_gpu_memory_mb()
+            logger.info(
+                f"Baseline GPU memory (model + KV cache): {baseline_memory_mb:.2f} MB"
+            )
+        else:
+            baseline_memory_mb = 0
+
         iteration_count = 0
         pbar = tqdm(
             total=self.args.num_runs + self.args.num_warmup, desc="Latency/Memory"
@@ -432,25 +485,33 @@ class SLiMEvaluator:
             )
             prompts = [self.args.prompt] * current_batch_size
 
-            self.clear_cache()
-            torch.cuda.reset_peak_memory_stats()
+            # Reset peak stats before each batch
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
 
             start_time = time.time()
             outputs = llm.generate(prompts, sampling_params)
-            torch.cuda.synchronize()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
             end_time = time.time()
 
             batch_latency = end_time - start_time
+
+            # Measure memory: peak during generation and current allocation
             peak_mem = self.get_peak_gpu_memory_mb()
             avg_mem = self.get_gpu_memory_mb()
+
             per_request_latency = batch_latency / current_batch_size
             batch_tokens = sum(len(output.outputs[0].token_ids) for output in outputs)
 
             for i in range(current_batch_size):
                 if iteration_count >= self.args.num_warmup:
                     latencies.append(per_request_latency)
-                    peak_memories.append(peak_mem)
-                    avg_memories.append(avg_mem)
+                    # Use baseline memory if measurements are 0
+                    peak_memories.append(
+                        peak_mem if peak_mem > 0 else baseline_memory_mb
+                    )
+                    avg_memories.append(avg_mem if avg_mem > 0 else baseline_memory_mb)
                     tokens_generated.append(batch_tokens / current_batch_size)
 
                 iteration_count += 1
@@ -463,6 +524,13 @@ class SLiMEvaluator:
                 break
 
         pbar.close()
+
+        # Cleanup NVML if initialized
+        if nvml_available:
+            try:
+                pynvml.nvmlShutdown()
+            except Exception:
+                pass
 
         lat = np.array(latencies)
         pm = np.array(peak_memories)
@@ -478,6 +546,7 @@ class SLiMEvaluator:
             "mean_peak_mem_mb": pm.mean(),
             "mean_avg_mem_mb": am.mean(),
             "tokens_per_second": tg.mean() / lat.mean(),
+            "baseline_memory_mb": baseline_memory_mb,
         }
 
         logger.info(
@@ -486,13 +555,28 @@ class SLiMEvaluator:
         return results
 
     def benchmark_energy(self, llm: LLM, model_name: str, precision: str) -> Dict:
-        """Measure energy consumption using CodeCarbon."""
+        """Measure energy consumption using PyNVML for accurate GPU power tracking."""
         logger.info("=" * 60)
-        logger.info("ENERGY CONSUMPTION BENCHMARK")
+        logger.info("ENERGY CONSUMPTION BENCHMARK (PyNVML)")
         logger.info("=" * 60)
         logger.info(
             f"Running {self.args.energy_sample_runs} inference samples with energy tracking..."
         )
+
+        if not PYNVML_AVAILABLE:
+            logger.error("PyNVML not available. Install with: pip install nvidia-ml-py")
+            return {
+                "energy_kwh": 0,
+                "energy_joules": 0,
+                "duration_seconds": 0,
+                "avg_power_watts": 0,
+                "min_power_watts": 0,
+                "max_power_watts": 0,
+                "std_power_watts": 0,
+                "num_samples": 0,
+                "energy_per_query_j": 0,
+                "error": "PyNVML not available",
+            }
 
         sampling_params = SamplingParams(
             temperature=0.0,
@@ -509,53 +593,90 @@ class SLiMEvaluator:
         ]
 
         try:
-            tracker = EmissionsTracker(
-                project_name=f"slim_eval_{model_name.split('/')[-1]}_{precision}",
-                output_dir=str(self.output_dir / "energy_logs"),
-                log_level="warning",
-                save_to_file=True,
-            )
+            # Initialize NVML
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
-            tracker.start()
+            power_samples = []
+            stop_monitoring = threading.Event()
+
+            def monitor_power():
+                """Background thread to monitor GPU power consumption."""
+                while not stop_monitoring.is_set():
+                    try:
+                        power_mw = pynvml.nvmlDeviceGetPowerUsage(handle)
+                        power_w = power_mw / 1000.0  # Convert milliwatts to watts
+                        power_samples.append(power_w)
+                    except Exception as e:
+                        logger.debug(f"Power sampling error: {e}")
+                    time.sleep(0.1)  # Sample every 100ms
+
+            # Start power monitoring thread
+            monitor_thread = threading.Thread(target=monitor_power, daemon=True)
+            monitor_thread.start()
+
             start_time = time.time()
 
+            # Run inference samples
             for i in tqdm(range(self.args.energy_sample_runs), desc="Energy tracking"):
                 prompt = test_prompts[i % len(test_prompts)]
                 prompts_batch = [prompt]
                 outputs = llm.generate(prompts_batch, sampling_params)
 
             end_time = time.time()
-            emissions = tracker.stop()
 
+            # Stop power monitoring
+            stop_monitoring.set()
+            monitor_thread.join(timeout=2.0)
+
+            # Shutdown NVML
+            pynvml.nvmlShutdown()
+
+            # Calculate energy metrics
             duration = end_time - start_time
 
+            if len(power_samples) == 0:
+                raise Exception("No power samples collected")
+
+            power_array = np.array(power_samples)
+            avg_power = power_array.mean()
+            energy_joules = avg_power * duration
+            energy_kwh = energy_joules / 3600000
+
             results = {
-                "energy_kwh": emissions,
-                "energy_joules": emissions * 3600000,
+                "energy_kwh": energy_kwh,
+                "energy_joules": energy_joules,
                 "duration_seconds": duration,
-                "avg_power_watts": (emissions * 3600000 / duration)
-                if duration > 0
-                else 0,
+                "avg_power_watts": avg_power,
+                "min_power_watts": power_array.min(),
+                "max_power_watts": power_array.max(),
+                "std_power_watts": power_array.std(),
                 "num_samples": self.args.energy_sample_runs,
-                "energy_per_query_j": (
-                    emissions * 3600000 / self.args.energy_sample_runs
-                )
-                if self.args.energy_sample_runs > 0
-                else 0,
+                "energy_per_query_j": energy_joules / self.args.energy_sample_runs,
+                "power_samples_collected": len(power_samples),
             }
 
             logger.info(
-                f"Energy: {results['energy_kwh'] * 1000:.4f} Wh | Avg Power: {results['avg_power_watts']:.2f}W"
+                f"Energy: {results['energy_kwh'] * 1000:.4f} Wh | "
+                f"Avg Power: {results['avg_power_watts']:.2f}W | "
+                f"Range: {results['min_power_watts']:.1f}-{results['max_power_watts']:.1f}W"
             )
             return results
 
         except Exception as e:
             logger.error(f"Energy tracking failed: {e}", exc_info=True)
+            try:
+                pynvml.nvmlShutdown()
+            except:
+                pass
             return {
                 "energy_kwh": 0,
                 "energy_joules": 0,
                 "duration_seconds": 0,
                 "avg_power_watts": 0,
+                "min_power_watts": 0,
+                "max_power_watts": 0,
+                "std_power_watts": 0,
                 "num_samples": 0,
                 "energy_per_query_j": 0,
                 "error": str(e),
@@ -574,7 +695,12 @@ class SLiMEvaluator:
         try:
             if precision == "fp16":
                 model_path = model_name
-                model_args = f"pretrained={model_path},dtype=float16,gpu_memory_utilization={self.args.gpu_memory_utilization},trust_remote_code=True,max_model_len={self.args.max_model_len},tensor_parallel_size=1"
+                model_args = (
+                    f"pretrained={model_path},dtype=float16,"
+                    f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
+                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
+                    f"tensor_parallel_size=1"
+                )
             else:
                 model_short_name = model_name.split("/")[-1]
                 quantized_path = (
@@ -590,7 +716,12 @@ class SLiMEvaluator:
                         f"Using base model with on-the-fly quantization: {precision}"
                     )
 
-                model_args = f"pretrained={model_path},dtype=auto,gpu_memory_utilization={self.args.gpu_memory_utilization},trust_remote_code=True,max_model_len={self.args.max_model_len},tensor_parallel_size=1"
+                model_args = (
+                    f"pretrained={model_path},dtype=auto,"
+                    f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
+                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
+                    f"tensor_parallel_size=1"
+                )
 
                 if not quantized_path.exists() and precision in [
                     "int8",
@@ -605,7 +736,7 @@ class SLiMEvaluator:
                 model_args=model_args,
                 tasks=self.args.accuracy_tasks,
                 num_fewshot=self.args.num_fewshot,
-                batch_size="auto",
+                batch_size=self.args.accuracy_batch_size,
                 limit=self.args.accuracy_limit,
                 log_samples=False,
             )
@@ -665,11 +796,12 @@ class SLiMEvaluator:
             return None
 
         try:
-            # 1. Latency & Memory
-            latency_memory_results = self.benchmark_latency_memory(
-                llm, model_name, precision
-            )
-            results.update(latency_memory_results)
+            # 1. Latency & Memory (if enabled)
+            if self.args.enable_latency_memory:
+                latency_memory_results = self.benchmark_latency_memory(
+                    llm, model_name, precision
+                )
+                results.update(latency_memory_results)
 
             # 2. Energy (if enabled)
             if self.args.enable_energy_tracking:
@@ -681,9 +813,16 @@ class SLiMEvaluator:
             self.clear_cache()
             time.sleep(2)
 
-            # 3. Accuracy
+            # 3. Accuracy (if enabled)
             if self.args.run_accuracy:
                 accuracy_results = self.benchmark_accuracy(model_name, precision)
+                results.update(accuracy_results)
+            else:
+                # Populate accuracy columns with NaN when accuracy is not run
+                accuracy_results = {
+                    f"{task}_accuracy": float("nan")
+                    for task in self.args.accuracy_tasks
+                }
                 results.update(accuracy_results)
 
             return results
@@ -718,6 +857,9 @@ class SLiMEvaluator:
             "energy_joules",
             "duration_seconds",
             "avg_power_watts",
+            "min_power_watts",
+            "max_power_watts",
+            "std_power_watts",
             "energy_per_query_j",
         ]
 
@@ -741,7 +883,7 @@ class SLiMEvaluator:
         logger.info(
             f"Total configs: {len(self.args.models) * len(self.args.precisions)}"
         )
-        logger.info(f"Metrics: Latency, Memory, Energy, Accuracy")
+        logger.info("Metrics: Latency, Memory, Energy, Accuracy")
         logger.info(f"Output: {self.results_csv}")
         logger.info(
             f"Estimated time: ~{len(self.args.models) * len(self.args.precisions) * 30} minutes"
@@ -760,7 +902,15 @@ class SLiMEvaluator:
                 if results:
                     all_results.append(results)
 
-                    pd.DataFrame([results]).to_csv(
+                    # Read the existing CSV to get the exact column order
+                    existing_df = pd.read_csv(self.results_csv)
+                    columns = existing_df.columns.tolist()
+
+                    # Create DataFrame with results in the correct column order
+                    results_df = pd.DataFrame([results], columns=columns)
+
+                    # Append to CSV
+                    results_df.to_csv(
                         self.results_csv, mode="a", header=False, index=False
                     )
                     logger.info(f"Results saved for {config_id}")
@@ -839,7 +989,7 @@ class SLiMEvaluator:
             for _, row in model_data.iterrows():
                 if row["precision"] != "fp16":
                     analysis_row = {
-                        "model": model.split("/")[-1],
+                        "model": str(model).split("/")[-1],
                         "precision": row["precision"],
                         "speedup": fp16_latency / row["mean_latency_s"],
                         "memory_reduction_pct": (
@@ -888,7 +1038,7 @@ class SLiMEvaluator:
             ax1.scatter(
                 data["mean_latency_s"],
                 data["mean_peak_mem_mb"],
-                label=precision.upper(),
+                label=str(precision).upper(),
                 s=150,
                 alpha=0.7,
             )
@@ -909,7 +1059,7 @@ class SLiMEvaluator:
                     ax2.scatter(
                         data["energy_kwh"],
                         data[acc_col],
-                        label=precision.upper(),
+                        label=str(precision).upper(),
                         s=150,
                         alpha=0.7,
                     )
@@ -921,7 +1071,7 @@ class SLiMEvaluator:
 
         # Plot 3: Throughput comparison
         ax3 = axes[1, 0]
-        models_short = results_df["model"].str.split("/").str[-1]
+        models_short = results_df["model"].astype(str).str.split("/").str[-1]
         x_positions = range(len(results_df))
         bar_width = 0.25
 
@@ -936,7 +1086,7 @@ class SLiMEvaluator:
                 positions,
                 data["tokens_per_second"],
                 width=bar_width,
-                label=precision.upper(),
+                label=str(precision).upper(),
                 alpha=0.7,
             )
 
@@ -951,8 +1101,14 @@ class SLiMEvaluator:
 
         # Plot 4: Accuracy comparison
         ax4 = axes[1, 1]
-        accuracy_cols = [col for col in results_df.columns if "accuracy" in col]
-        if accuracy_cols:
+        accuracy_cols = [col for col in results_df.columns if col.endswith("_accuracy")]
+        # Only plot if we have accuracy columns with valid non-NaN data
+        has_valid_accuracy = (
+            accuracy_cols
+            and not results_df[accuracy_cols].isna().all().all()
+            and results_df[accuracy_cols].max().max() > 0
+        )
+        if has_valid_accuracy:
             results_df["avg_accuracy"] = results_df[accuracy_cols].mean(axis=1)
             for i, precision in enumerate(precisions):
                 data = results_df[results_df["precision"] == precision]
@@ -964,7 +1120,7 @@ class SLiMEvaluator:
                     positions,
                     data["avg_accuracy"],
                     width=bar_width,
-                    label=precision.upper(),
+                    label=str(precision).upper(),
                     alpha=0.7,
                 )
             ax4.set_xlabel("Model")
@@ -977,6 +1133,13 @@ class SLiMEvaluator:
                 ha="right",
             )
             ax4.legend()
+        else:
+            # If no accuracy data, hide the plot
+            ax4.text(
+                0.5, 0.5, "No Accuracy Data", ha="center", va="center", fontsize=14
+            )
+            ax4.set_xticks([])
+            ax4.set_yticks([])
 
         plt.tight_layout()
         plot_path = self.output_dir / "pareto_frontiers.png"
@@ -1039,7 +1202,7 @@ class SLiMEvaluator:
             paper_columns.extend(accuracy_cols[:3])
 
         paper_table = results_df[paper_columns].copy()
-        paper_table["model"] = paper_table["model"].str.split("/").str[-1]
+        paper_table["model"] = paper_table["model"].astype(str).str.split("/").str[-1]
 
         rename_map = {
             "num_parameters_b": "Params (B)",
@@ -1083,44 +1246,62 @@ class SLiMEvaluator:
         ]
 
         if len(results_df) > 0:
-            fastest = results_df.loc[results_df["mean_latency_s"].idxmin()]
-            report_lines.append("\n1. FASTEST MODEL:")
-            report_lines.append(
-                f"   {fastest['model'].split('/')[-1]} ({fastest['precision']})"
-            )
-            report_lines.append(f"   Latency: {fastest['mean_latency_s']:.4f}s")
+            # 1. Fastest model (guard for NaNs)
+            if "mean_latency_s" in results_df.columns:
+                lat_series = results_df["mean_latency_s"].dropna()
+                if not lat_series.empty:
+                    fastest_idx = lat_series.idxmin()
+                    fastest = results_df.loc[fastest_idx]
+                    report_lines.append("\n1. FASTEST MODEL:")
+                    report_lines.append(
+                        f"   {str(fastest['model']).split('/')[-1]} ({fastest['precision']})"
+                    )
+                    report_lines.append(f"   Latency: {fastest['mean_latency_s']:.4f}s")
 
-            mem_efficient = results_df.loc[results_df["mean_peak_mem_mb"].idxmin()]
-            report_lines.append("\n2. MOST MEMORY EFFICIENT:")
-            report_lines.append(
-                f"   {mem_efficient['model'].split('/')[-1]} ({mem_efficient['precision']})"
-            )
-            report_lines.append(
-                f"   Memory: {mem_efficient['mean_peak_mem_mb']:.2f} MB"
-            )
+            # 2. Most memory efficient (guard for NaNs)
+            if "mean_peak_mem_mb" in results_df.columns:
+                mem_series = results_df["mean_peak_mem_mb"].dropna()
+                if not mem_series.empty:
+                    mem_idx = mem_series.idxmin()
+                    mem_efficient = results_df.loc[mem_idx]
+                    report_lines.append("\n2. MOST MEMORY EFFICIENT:")
+                    report_lines.append(
+                        f"   {str(mem_efficient['model']).split('/')[-1]} ({mem_efficient['precision']})"
+                    )
+                    report_lines.append(
+                        f"   Memory: {mem_efficient['mean_peak_mem_mb']:.2f} MB"
+                    )
 
-            highest_throughput = results_df.loc[
-                results_df["tokens_per_second"].idxmax()
-            ]
-            report_lines.append("\n3. HIGHEST THROUGHPUT:")
-            report_lines.append(
-                f"   {highest_throughput['model'].split('/')[-1]} ({highest_throughput['precision']})"
-            )
-            report_lines.append(
-                f"   Throughput: {highest_throughput['tokens_per_second']:.2f} tokens/s"
-            )
+            # 3. Highest throughput (guard for NaNs)
+            if "tokens_per_second" in results_df.columns:
+                tps_series = results_df["tokens_per_second"].dropna()
+                if not tps_series.empty:
+                    tps_idx = tps_series.idxmax()
+                    highest_throughput = results_df.loc[tps_idx]
+                    report_lines.append("\n3. HIGHEST THROUGHPUT:")
+                    report_lines.append(
+                        f"   {str(highest_throughput['model']).split('/')[-1]} ({highest_throughput['precision']})"
+                    )
+                    report_lines.append(
+                        f"   Throughput: {highest_throughput['tokens_per_second']:.2f} tokens/s"
+                    )
 
             accuracy_cols = [col for col in results_df.columns if "accuracy" in col]
             if accuracy_cols:
-                results_df["avg_accuracy"] = results_df[accuracy_cols].mean(axis=1)
-                best_accuracy = results_df.loc[results_df["avg_accuracy"].idxmax()]
-                report_lines.append("\n4. BEST AVERAGE ACCURACY:")
-                report_lines.append(
-                    f"   {best_accuracy['model'].split('/')[-1]} ({best_accuracy['precision']})"
-                )
-                report_lines.append(
-                    f"   Avg Accuracy: {best_accuracy['avg_accuracy']:.4f}"
-                )
+                # Compute average accuracy while ignoring NaNs
+                avg_acc_series = results_df[accuracy_cols].mean(axis=1, skipna=True)
+                # Filter out NaNs and non-positive
+                valid_avg = avg_acc_series.dropna()
+                if not valid_avg.empty and valid_avg.max() > 0:
+                    best_idx = valid_avg.idxmax()
+                    best_accuracy = results_df.loc[best_idx]
+                    report_lines.append("\n4. BEST AVERAGE ACCURACY:")
+                    report_lines.append(
+                        f"   {str(best_accuracy['model']).split('/')[-1]} ({best_accuracy['precision']})"
+                    )
+                    report_lines.append(
+                        f"   Avg Accuracy: {valid_avg.loc[best_idx]:.4f}"
+                    )
 
         report_lines.append("\n" + "=" * 70)
         report_lines.append("END OF REPORT")
@@ -1210,19 +1391,7 @@ def parse_args():
         help="Prompt for benchmarking",
     )
 
-    # Accuracy configuration
-    parser.add_argument(
-        "--run-accuracy",
-        action="store_true",
-        default=True,
-        help="Run accuracy evaluation",
-    )
-    parser.add_argument(
-        "--no-accuracy",
-        action="store_false",
-        dest="run_accuracy",
-        help="Skip accuracy evaluation",
-    )
+    # Accuracy configuration (controlled via --benchmarks)
     parser.add_argument(
         "--accuracy-tasks",
         nargs="+",
@@ -1241,25 +1410,31 @@ def parse_args():
         default=None,
         help="Limit number of examples per task (for testing)",
     )
+    parser.add_argument(
+        "--accuracy-batch-size",
+        type=int,
+        default=1,
+        help="Batch size used by lm-eval during accuracy evaluation (reduce to avoid GPU OOM)",
+    )
 
-    # Energy configuration
-    parser.add_argument(
-        "--enable-energy-tracking",
-        action="store_true",
-        default=True,
-        help="Enable energy tracking",
-    )
-    parser.add_argument(
-        "--no-energy",
-        action="store_false",
-        dest="enable_energy_tracking",
-        help="Disable energy tracking",
-    )
+    # Energy configuration (controlled via --benchmarks)
     parser.add_argument(
         "--energy-sample-runs",
         type=int,
         default=100,
         help="Number of runs for energy measurement",
+    )
+
+    # Unified benchmark selection
+    parser.add_argument(
+        "--benchmarks",
+        nargs="+",
+        choices=["latency_memory", "energy", "accuracy"],
+        default=None,
+        help=(
+            "Select which benchmarks to run. Choices: latency_memory, energy, accuracy. "
+            "If provided, overrides legacy flags like --run-accuracy and --enable-energy-tracking."
+        ),
     )
 
     # Quantization configuration
@@ -1298,7 +1473,7 @@ def parse_args():
     parser.add_argument(
         "--max-model-len",
         type=int,
-        default=2048,
+        default=8192,
         help="Maximum model length for vLLM",
     )
 
@@ -1325,7 +1500,15 @@ def parse_args():
         help="Run mode: 'all' (benchmark + analyze), 'benchmark' (only run benchmarks), 'analyze' (only analyze existing results)",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # Unified control: derive booleans from --benchmarks exclusively
+    selected = set(args.benchmarks or [])
+    args.enable_latency_memory = "latency_memory" in selected
+    args.enable_energy_tracking = "energy" in selected
+    args.run_accuracy = "accuracy" in selected
+
+    return args
 
 
 def main():
@@ -1334,13 +1517,17 @@ def main():
 
     evaluator = SLiMEvaluator(args)
 
-    if args.mode in ["all", "benchmark"]:
-        evaluator.run_all_benchmarks()
+    try:
+        if args.mode in ["all", "benchmark"]:
+            evaluator.run_all_benchmarks()
 
-    if args.mode in ["all", "analyze"]:
-        evaluator.analyze_results()
+        if args.mode in ["all", "analyze"]:
+            evaluator.analyze_results()
 
-    logger.info("SLiM-Eval complete!")
+        logger.info("SLiM-Eval complete!")
+    finally:
+        # Ensure proper cleanup of distributed resources
+        evaluator.clear_cache()
 
 
 if __name__ == "__main__":
