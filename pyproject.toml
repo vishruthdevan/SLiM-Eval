@@ -1,10 +1,55 @@
 [project]
 name = "slim-eval"
 version = "0.1.0"
-description = "Add your description here"
+description = "Complete Small Language Model Evaluation Framework - Tracking Latency, Memory, Energy, and Accuracy"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.10"
+dependencies = [
+    # Core ML Frameworks
+    "torch>=2.8.0",
+    "torchvision>=0.20.0",
+    "torchaudio>=2.5.0",
+    
+    # LLM Inference & Quantization
+    "vllm>=0.6.0",
+    "llmcompressor>=0.7.0",
+    "transformers>=4.40.0",
+    "accelerate>=0.30.0",
+    "tokenizers>=0.19.0",
+    
+    # Evaluation & Benchmarking
+    "lm-eval>=0.4.0",
+    
+    # Energy Tracking
+    "codecarbon>=2.3.0",
+    
+    # Data Processing & Analysis
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    
+    # Visualization
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    
+    # Progress & Utilities
+    "tqdm>=4.65.0",
+    "psutil>=5.9.0",
+    
+    # Jupyter Support (optional but recommended)
+    "jupyter>=1.0.0",
+    "ipykernel>=6.25.0",
+    "ipywidgets>=8.1.0",
+]
 
+
+[tool.uv]
+# CUDA 12.8 PyTorch index
 [[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu130/"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+name = "pytorch-cu128"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
