@@ -117,6 +117,11 @@ class SLiMEvaluator:
                         model_name, precision, quantized_path
                     )
 
+                    # Clear GPU memory after quantization
+                    logger.info("Clearing GPU memory after quantization...")
+                    clear_cache()
+                    time.sleep(2)  # Give time for memory to be fully released
+
                     if quantized_path.exists():
                         model_path = str(quantized_path)
                         dtype = "auto"
