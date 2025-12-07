@@ -116,21 +116,59 @@ class AccuracyBenchmark(BaseBenchmark):
                 )
 
                 for task_name, task_res in results["results"].items():
-                    if "acc" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc"]
-                    elif "acc_norm" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc_norm"]
+                    logger.info(f"Task '{task_name}' metrics: {list(task_res.keys())}")
+                    logger.info(f"Task '{task_name}' values: {task_res}")
+
+                    metric_found = False
+
+                    if "exact_match,flexible-extract" in task_res:
+                        accuracy_results[f"{task_name}_accuracy"] = task_res[
+                            "exact_match,flexible-extract"
+                        ]
+                        logger.info(
+                            f"Using 'exact_match,flexible-extract': {task_res['exact_match,flexible-extract']}"
+                        )
+                        metric_found = True
+                    elif "exact_match,strict-match" in task_res:
+                        accuracy_results[f"{task_name}_accuracy"] = task_res[
+                            "exact_match,strict-match"
+                        ]
+                        logger.info(
+                            f"Using 'exact_match,strict-match': {task_res['exact_match,strict-match']}"
+                        )
+                        metric_found = True
                     elif "exact_match" in task_res:
                         accuracy_results[f"{task_name}_accuracy"] = task_res[
                             "exact_match"
                         ]
+                        logger.info(f"Using 'exact_match': {task_res['exact_match']}")
+                        metric_found = True
+                    elif "acc_norm" in task_res:
+                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc_norm"]
+                        logger.info(f"Using 'acc_norm': {task_res['acc_norm']}")
+                        metric_found = True
+                    elif "acc" in task_res:
+                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc"]
+                        logger.info(f"Using 'acc': {task_res['acc']}")
+                        metric_found = True
                     elif "pass@1" in task_res:
                         accuracy_results[f"{task_name}_accuracy"] = task_res["pass@1"]
-                    else:
+                        logger.info(f"Using 'pass@1': {task_res['pass@1']}")
+                        metric_found = True
+
+                    if not metric_found:
                         for key, value in task_res.items():
                             if isinstance(value, (int, float)) and 0 <= value <= 1:
                                 accuracy_results[f"{task_name}_accuracy"] = value
+                                logger.info(f"Using fallback metric '{key}': {value}")
+                                metric_found = True
                                 break
+
+                    if not metric_found:
+                        logger.warning(
+                            f"No valid metric found for '{task_name}'. Setting accuracy to 0."
+                        )
+                        accuracy_results[f"{task_name}_accuracy"] = 0.0
 
             logger.info("Accuracy results:")
             for task, acc in accuracy_results.items():
