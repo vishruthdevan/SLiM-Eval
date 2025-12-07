@@ -48,39 +48,46 @@ pip install -e ".[dev]"
 
 ### Basic Usage
 
-Run a complete benchmark suite on a model:
+Run a complete benchmark suite on a model (using comprehensive defaults):
 
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
   --precisions "fp16 int8 int4 gptq" \
-  --tasks "performance energy accuracy" \
   --output-dir outputs
 ```
 
+This will run the full benchmark suite with:
+
+- 10 warmup runs + 500 measured runs for stable statistics
+- Batch size of 8 for improved throughput
+- 256 token generation
+- Full accuracy evaluation (MMLU, GSM8K, HellaSwag, HumanEval) with 5-shot
+- 200 energy sample runs for stable power estimates
+
 ### Performance-Only Benchmark
 
-Fast latency and memory profiling:
+Quick latency and memory profiling (reduced runs for faster results):
 
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
   --precisions "fp16 int4" \
   --tasks performance \
-  --num-runs 20
+  --num-runs 50 \
+  --num-warmup 5
 ```
 
 ### Accuracy Evaluation
 
-Run model quality benchmarks:
+Run model quality benchmarks (uses 5-shot by default):
 
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
   --precisions "fp16 int4" \
   --tasks accuracy \
-  --accuracy-tasks "mmlu gsm8k hellaswag" \
-  --num-fewshot 5
+  --accuracy-tasks "mmlu gsm8k hellaswag human_eval"
 ```
 
 ### Analyze Previous Results
@@ -108,25 +115,25 @@ slim-eval analyze --output-dir outputs
   - `performance`: Latency & memory usage
   - `energy`: Power consumption tracking
   - `accuracy`: Model quality metrics
-  - Default: `performance`
+  - Default: `performance accuracy energy` (full suite)
 
 #### Performance Benchmark Options
 
-- `--num-warmup`: Warmup iterations before measurement (default: 2)
-- `--num-runs`: Number of measured inference runs (default: 10)
-- `--batch-size`: Concurrent requests per iteration (default: 1)
-- `--prompt`: Input prompt for latency tests (default: "Hello, world!")
-- `--max-new-tokens`: Tokens to generate per request (default: 128)
+- `--num-warmup`: Warmup iterations before measurement (default: 10)
+- `--num-runs`: Number of measured inference runs (default: 500)
+- `--batch-size`: Concurrent requests per iteration (default: 8)
+- `--prompt`: Input prompt for latency tests (default: "Explain one interesting fact about large language models.")
+- `--max-new-tokens`: Tokens to generate per request (default: 256)
 
 #### Energy Benchmark Options
 
-- `--energy-sample-runs`: Number of energy-tracked requests (default: 10)
+- `--energy-sample-runs`: Number of energy-tracked requests (default: 200)
 
 #### Accuracy Benchmark Options
 
-- `--accuracy-tasks`: lm-eval tasks to run (default: `mmlu`, `gsm8k`, `hellaswag`)
-- `--num-fewshot`: Few-shot examples (default: 0)
-- `--accuracy-limit`: Limit examples per task for quick testing
+- `--accuracy-tasks`: lm-eval tasks to run (default: `mmlu`, `gsm8k`, `hellaswag`, `human_eval`)
+- `--num-fewshot`: Few-shot examples (default: 5)
+- `--accuracy-limit`: Limit examples per task for quick testing (default: None - run full benchmark)
 - `--accuracy-batch-size`: Global batch size (default: 32)
 - `--accuracy-batch-size-{task}`: Per-task batch size overrides
 
@@ -138,7 +145,7 @@ slim-eval analyze --output-dir outputs
 #### Quantization Options
 
 - `--calibration-dataset`: Dataset for calibration (default: `HuggingFaceH4/ultrachat_200k`)
-- `--calibration-split`: Dataset split (default: `train`)
+- `--calibration-split`: Dataset split (default: `train_sft`)
 - `--num-calibration-samples`: Calibration samples (default: 512)
 - `--max-sequence-length`: Max sequence length for calibration (default: 2048)
 

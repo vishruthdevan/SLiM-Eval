@@ -64,17 +64,17 @@ def run(
     ] = "quantized-models",
     num_warmup: Annotated[
         int, typer.Option(help="Warmup requests before measuring")
-    ] = 2,
-    num_runs: Annotated[int, typer.Option(help="Number of measured requests")] = 10,
+    ] = 10,
+    num_runs: Annotated[int, typer.Option(help="Number of measured requests")] = 500,
     batch_size: Annotated[
         int, typer.Option(help="Concurrent requests per iteration")
-    ] = 1,
+    ] = 8,
     prompt: Annotated[
         str, typer.Option(help="Prompt used for latency tests")
-    ] = "Hello, world!",
+    ] = "Explain one interesting fact about large language models.",
     max_new_tokens: Annotated[
         int, typer.Option(help="Max tokens to generate per request")
-    ] = 128,
+    ] = 256,
     gpu_memory_utilization: Annotated[
         float, typer.Option(help="vLLM GPU memory utilization fraction")
     ] = 0.9,
@@ -86,16 +86,16 @@ def run(
         typer.Option(
             help="Space-separated benchmark tasks. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)"
         ),
-    ] = "performance",
+    ] = "performance accuracy energy",
     energy_sample_runs: Annotated[
         int, typer.Option(help="Number of energy-tracked requests")
-    ] = 10,
+    ] = 200,
     accuracy_tasks: Annotated[
         str, typer.Option(help="Space-separated lm-eval tasks to run")
     ] = "mmlu gsm8k hellaswag",
     num_fewshot: Annotated[
         int, typer.Option(help="Few-shot examples for accuracy tasks")
-    ] = 0,
+    ] = 5,
     accuracy_limit: Annotated[
         Optional[int], typer.Option(help="Limit examples per task for quick runs")
     ] = None,
