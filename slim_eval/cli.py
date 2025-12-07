@@ -93,24 +93,18 @@ def _build_args(**kwargs):
     help="vLLM max model length (context window)",
 )
 @click.option(
-    "--enable-latency-memory/--disable-latency-memory", default=True, show_default=True
-)
-@click.option(
-    "--enable-energy-tracking/--disable-energy-tracking",
-    default=False,
+    "--tasks",
+    multiple=True,
+    type=click.Choice(["performance", "energy", "accuracy"], case_sensitive=False),
+    default=["performance"],
     show_default=True,
+    help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)",
 )
 @click.option(
     "--energy-sample-runs",
     default=10,
     show_default=True,
     help="Number of energy-tracked requests",
-)
-@click.option(
-    "--run-accuracy/--skip-accuracy",
-    default=False,
-    show_default=True,
-    help="Run lm-eval accuracy suite",
 )
 @click.option(
     "--accuracy-tasks",
@@ -133,25 +127,25 @@ def _build_args(**kwargs):
 )
 @click.option(
     "--accuracy-batch-size",
-    default=8,
+    default=32,
     show_default=True,
     help="Global lm-eval batch size",
 )
 @click.option(
     "--accuracy-batch-size-hellaswag",
-    default=None,
+    default=32,
     type=int,
     help="Override batch size for hellaswag",
 )
 @click.option(
     "--accuracy-batch-size-gsm8k",
-    default=None,
+    default=32,
     type=int,
     help="Override batch size for gsm8k",
 )
 @click.option(
     "--accuracy-batch-size-mmlu",
-    default=None,
+    default=32,
     type=int,
     help="Override batch size for mmlu",
 )
@@ -173,10 +167,8 @@ def run(
     max_new_tokens: int,
     gpu_memory_utilization: float,
     max_model_len: int,
-    enable_latency_memory: bool,
-    enable_energy_tracking: bool,
+    tasks: List[str],
     energy_sample_runs: int,
-    run_accuracy: bool,
     accuracy_tasks: List[str],
     num_fewshot: int,
     accuracy_limit: int,
@@ -189,6 +181,12 @@ def run(
     num_calibration_samples: int,
     max_sequence_length: int,
 ):
+    # Convert task list to boolean flags
+    tasks_list = [t.lower() for t in tasks]
+    enable_performance_tracking = "performance" in tasks_list
+    enable_energy_tracking = "energy" in tasks_list
+    enable_accuracy_tracking = "accuracy" in tasks_list
+
     args = _build_args(
         models=list(models),
         precisions=list(precisions),
@@ -201,10 +199,10 @@ def run(
         max_new_tokens=max_new_tokens,
         gpu_memory_utilization=gpu_memory_utilization,
         max_model_len=max_model_len,
-        enable_latency_memory=enable_latency_memory,
+        enable_performance_tracking=enable_performance_tracking,
         enable_energy_tracking=enable_energy_tracking,
         energy_sample_runs=energy_sample_runs,
-        run_accuracy=run_accuracy,
+        enable_accuracy_tracking=enable_accuracy_tracking,
         accuracy_tasks=list(accuracy_tasks),
         num_fewshot=num_fewshot,
         accuracy_limit=accuracy_limit,
@@ -224,7 +222,14 @@ def run(
 
 @cli.command("analyze", help="Analyze and visualize previously saved results")
 @click.option("--output-dir", default="outputs", show_default=True)
-def analyze(output_dir: str):
+@click.option(
+    "--accuracy-tasks",
+    multiple=True,
+    default=["mmlu", "gsm8k", "hellaswag"],
+    show_default=True,
+    help="Accuracy tasks to include in analysis",
+)
+def analyze(output_dir: str, accuracy_tasks: List[str]):
     args = _build_args(
         models=[],
         precisions=[],
@@ -237,11 +242,11 @@ def analyze(output_dir: str):
         max_new_tokens=0,
         gpu_memory_utilization=0.9,
         max_model_len=8192,
-        enable_latency_memory=False,
+        enable_performance_tracking=False,
         enable_energy_tracking=False,
         energy_sample_runs=0,
-        run_accuracy=False,
-        accuracy_tasks=[],
+        enable_accuracy_tracking=False,
+        accuracy_tasks=list(accuracy_tasks),
         num_fewshot=0,
         accuracy_limit=None,
         accuracy_batch_size=0,
