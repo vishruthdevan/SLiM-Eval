@@ -1,8 +1,9 @@
 import logging
-from pathlib import Path
-from typing import List
+from enum import Enum
+from typing import List, Optional
 
-import click
+import typer
+from typing_extensions import Annotated
 
 from .evaluator import SLiMEvaluator
 
@@ -11,12 +12,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+app = typer.Typer(help="SLiM-Eval: Quantize and benchmark LLMs for speed, memory, energy, and accuracy.")
 
-@click.group(
-    help="SLiM-Eval: Quantize and benchmark LLMs for speed, memory, energy, and accuracy."
-)
-def cli():
-    pass
+
+class Precision(str, Enum):
+    """Available precision modes."""
+    fp16 = "fp16"
+    int8 = "int8"
+    int4 = "int4"
+    gptq = "gptq"
+
+
+class Task(str, Enum):
+    """Available benchmark tasks."""
+    performance = "performance"
+    energy = "energy"
+    accuracy = "accuracy"
 
 
 def _build_args(**kwargs):
@@ -29,167 +40,52 @@ def _build_args(**kwargs):
     return args
 
 
-@cli.command("run", help="Run complete benchmarks across models and precisions")
-@click.option(
-    "--models", multiple=True, required=True, help="HF model ids or local paths"
-)
-@click.option(
-    "--precisions",
-    multiple=True,
-    type=click.Choice(["fp16", "int8", "int4", "gptq"], case_sensitive=False),
-    default=["fp16", "int8", "int4", "gptq"],
-    show_default=True,
-    help="Precisions to evaluate: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only).",
-)
-@click.option(
-    "--output-dir",
-    default="outputs",
-    show_default=True,
-    help="Directory to write results",
-)
-@click.option(
-    "--quantized-models-dir",
-    default="quantized-models",
-    show_default=True,
-    help="Directory to store/load pre-quantized models",
-)
-@click.option(
-    "--num-warmup",
-    default=2,
-    show_default=True,
-    help="Warmup requests before measuring",
-)
-@click.option(
-    "--num-runs", default=10, show_default=True, help="Number of measured requests"
-)
-@click.option(
-    "--batch-size",
-    default=1,
-    show_default=True,
-    help="Concurrent requests per iteration",
-)
-@click.option(
-    "--prompt",
-    default="Hello, world!",
-    show_default=True,
-    help="Prompt used for latency tests",
-)
-@click.option(
-    "--max-new-tokens",
-    default=128,
-    show_default=True,
-    help="Max tokens to generate per request",
-)
-@click.option(
-    "--gpu-memory-utilization",
-    default=0.9,
-    show_default=True,
-    help="vLLM GPU memory utilization fraction",
-)
-@click.option(
-    "--max-model-len",
-    default=8192,
-    show_default=True,
-    help="vLLM max model length (context window)",
-)
-@click.option(
-    "--tasks",
-    multiple=True,
-    type=click.Choice(["performance", "energy", "accuracy"], case_sensitive=False),
-    default=["performance"],
-    show_default=True,
-    help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)",
-)
-@click.option(
-    "--energy-sample-runs",
-    default=10,
-    show_default=True,
-    help="Number of energy-tracked requests",
-)
-@click.option(
-    "--accuracy-tasks",
-    multiple=True,
-    default=["mmlu", "gsm8k", "hellaswag"],
-    show_default=True,
-    help="lm-eval tasks to run",
-)
-@click.option(
-    "--num-fewshot",
-    default=0,
-    show_default=True,
-    help="Few-shot examples for accuracy tasks",
-)
-@click.option(
-    "--accuracy-limit",
-    default=None,
-    type=int,
-    help="Limit examples per task for quick runs",
-)
-@click.option(
-    "--accuracy-batch-size",
-    default=32,
-    show_default=True,
-    help="Global lm-eval batch size",
-)
-@click.option(
-    "--accuracy-batch-size-hellaswag",
-    default=32,
-    type=int,
-    help="Override batch size for hellaswag",
-)
-@click.option(
-    "--accuracy-batch-size-gsm8k",
-    default=32,
-    type=int,
-    help="Override batch size for gsm8k",
-)
-@click.option(
-    "--accuracy-batch-size-mmlu",
-    default=32,
-    type=int,
-    help="Override batch size for mmlu",
-)
-@click.option(
-    "--calibration-dataset", default="HuggingFaceH4/ultrachat_200k", show_default=True
-)
-@click.option("--calibration-split", default="train", show_default=True)
-@click.option("--num-calibration-samples", default=512, show_default=True)
-@click.option("--max-sequence-length", default=2048, show_default=True)
+@app.command()
 def run(
-    models: List[str],
-    precisions: List[str],
-    output_dir: str,
-    quantized_models_dir: str,
-    num_warmup: int,
-    num_runs: int,
-    batch_size: int,
-    prompt: str,
-    max_new_tokens: int,
-    gpu_memory_utilization: float,
-    max_model_len: int,
-    tasks: List[str],
-    energy_sample_runs: int,
-    accuracy_tasks: List[str],
-    num_fewshot: int,
-    accuracy_limit: int,
-    accuracy_batch_size: int,
-    accuracy_batch_size_hellaswag: int,
-    accuracy_batch_size_gsm8k: int,
-    accuracy_batch_size_mmlu: int,
-    calibration_dataset: str,
-    calibration_split: str,
-    num_calibration_samples: int,
-    max_sequence_length: int,
+    models: Annotated[List[str], typer.Option(help="HF model ids or local paths")],
+    precisions: Annotated[
+        List[Precision],
+        typer.Option(help="Precisions to evaluate: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)")
+    ] = [Precision.fp16, Precision.int8, Precision.int4, Precision.gptq],
+    output_dir: Annotated[str, typer.Option(help="Directory to write results")] = "outputs",
+    quantized_models_dir: Annotated[str, typer.Option(help="Directory to store/load pre-quantized models")] = "quantized-models",
+    num_warmup: Annotated[int, typer.Option(help="Warmup requests before measuring")] = 2,
+    num_runs: Annotated[int, typer.Option(help="Number of measured requests")] = 10,
+    batch_size: Annotated[int, typer.Option(help="Concurrent requests per iteration")] = 1,
+    prompt: Annotated[str, typer.Option(help="Prompt used for latency tests")] = "Hello, world!",
+    max_new_tokens: Annotated[int, typer.Option(help="Max tokens to generate per request")] = 128,
+    gpu_memory_utilization: Annotated[float, typer.Option(help="vLLM GPU memory utilization fraction")] = 0.9,
+    max_model_len: Annotated[int, typer.Option(help="vLLM max model length (context window)")] = 8192,
+    tasks: Annotated[
+        List[Task],
+        typer.Option(help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)")
+    ] = [Task.performance],
+    energy_sample_runs: Annotated[int, typer.Option(help="Number of energy-tracked requests")] = 10,
+    accuracy_tasks: Annotated[
+        List[str],
+        typer.Option(help="lm-eval tasks to run")
+    ] = ["mmlu", "gsm8k", "hellaswag"],
+    num_fewshot: Annotated[int, typer.Option(help="Few-shot examples for accuracy tasks")] = 0,
+    accuracy_limit: Annotated[Optional[int], typer.Option(help="Limit examples per task for quick runs")] = None,
+    accuracy_batch_size: Annotated[int, typer.Option(help="Global lm-eval batch size")] = 32,
+    accuracy_batch_size_hellaswag: Annotated[int, typer.Option(help="Override batch size for hellaswag")] = 32,
+    accuracy_batch_size_gsm8k: Annotated[int, typer.Option(help="Override batch size for gsm8k")] = 32,
+    accuracy_batch_size_mmlu: Annotated[int, typer.Option(help="Override batch size for mmlu")] = 32,
+    calibration_dataset: Annotated[str, typer.Option(help="Calibration dataset for quantization")] = "HuggingFaceH4/ultrachat_200k",
+    calibration_split: Annotated[str, typer.Option(help="Dataset split for calibration")] = "train",
+    num_calibration_samples: Annotated[int, typer.Option(help="Number of calibration samples")] = 512,
+    max_sequence_length: Annotated[int, typer.Option(help="Max sequence length for calibration")] = 2048,
 ):
+    """Run complete benchmarks across models and precisions."""
     # Convert task list to boolean flags
-    tasks_list = [t.lower() for t in tasks]
+    tasks_list = [t.value for t in tasks]
     enable_performance_tracking = "performance" in tasks_list
     enable_energy_tracking = "energy" in tasks_list
     enable_accuracy_tracking = "accuracy" in tasks_list
 
     args = _build_args(
         models=list(models),
-        precisions=list(precisions),
+        precisions=[p.value for p in precisions],
         output_dir=output_dir,
         quantized_models_dir=quantized_models_dir,
         num_warmup=num_warmup,
@@ -220,16 +116,15 @@ def run(
     evaluator.run_all_benchmarks()
 
 
-@cli.command("analyze", help="Analyze and visualize previously saved results")
-@click.option("--output-dir", default="outputs", show_default=True)
-@click.option(
-    "--accuracy-tasks",
-    multiple=True,
-    default=["mmlu", "gsm8k", "hellaswag"],
-    show_default=True,
-    help="Accuracy tasks to include in analysis",
-)
-def analyze(output_dir: str, accuracy_tasks: List[str]):
+@app.command()
+def analyze(
+    output_dir: Annotated[str, typer.Option(help="Directory containing results")] = "outputs",
+    accuracy_tasks: Annotated[
+        List[str],
+        typer.Option(help="Accuracy tasks to include in analysis")
+    ] = ["mmlu", "gsm8k", "hellaswag"],
+):
+    """Analyze and visualize previously saved results."""
     args = _build_args(
         models=[],
         precisions=[],
@@ -263,4 +158,4 @@ def analyze(output_dir: str, accuracy_tasks: List[str]):
 
 
 def main():
-    cli()
+    app()
