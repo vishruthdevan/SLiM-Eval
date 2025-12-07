@@ -53,8 +53,8 @@ Run a complete benchmark suite on a model:
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
-  --precisions fp16 int8 int4 gptq \
-  --tasks performance energy accuracy \
+  --precisions "fp16 int8 int4 gptq" \
+  --tasks "performance energy accuracy" \
   --output-dir outputs
 ```
 
@@ -65,7 +65,7 @@ Fast latency and memory profiling:
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
-  --precisions fp16 int4 \
+  --precisions "fp16 int4" \
   --tasks performance \
   --num-runs 20
 ```
@@ -77,9 +77,9 @@ Run model quality benchmarks:
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
-  --precisions fp16 int4 \
+  --precisions "fp16 int4" \
   --tasks accuracy \
-  --accuracy-tasks mmlu gsm8k hellaswag \
+  --accuracy-tasks "mmlu gsm8k hellaswag" \
   --num-fewshot 5
 ```
 
@@ -220,9 +220,9 @@ outputs/
 
 ```bash
 slim-eval run \
-  --models "meta-llama/Llama-3.2-1B" "meta-llama/Llama-3.2-3B" \
-  --precisions fp16 int4 \
-  --tasks performance accuracy \
+  --models "meta-llama/Llama-3.2-1B meta-llama/Llama-3.2-3B" \
+  --precisions "fp16 int4" \
+  --tasks "performance accuracy" \
   --output-dir multi_model_comparison
 ```
 
@@ -231,7 +231,7 @@ slim-eval run \
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
-  --precisions fp16 int4 \
+  --precisions "fp16 int4" \
   --tasks accuracy \
   --accuracy-limit 100 \
   --accuracy-tasks mmlu
@@ -242,7 +242,7 @@ slim-eval run \
 ```bash
 slim-eval run \
   --models "meta-llama/Llama-3.2-3B-Instruct" \
-  --precisions fp16 int8 int4 \
+  --precisions "fp16 int8 int4" \
   --tasks energy \
   --energy-sample-runs 50
 ```

@@ -46,13 +46,16 @@ def _build_args(**kwargs):
 
 @app.command()
 def run(
-    models: Annotated[List[str], typer.Option(help="HF model ids or local paths")],
+    models: Annotated[
+        str,
+        typer.Option(help="Space-separated HF model ids or local paths"),
+    ] = "meta-llama/Llama-3.2-3B-Instruct",
     precisions: Annotated[
-        List[Precision],
+        str,
         typer.Option(
-            help="Precisions to evaluate: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
+            help="Space-separated precisions: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
         ),
-    ] = [Precision.fp16, Precision.int8, Precision.int4, Precision.gptq],
+    ] = "fp16 int8 int4 gptq",
     output_dir: Annotated[
         str, typer.Option(help="Directory to write results")
     ] = "outputs",
@@ -79,19 +82,17 @@ def run(
         int, typer.Option(help="vLLM max model length (context window)")
     ] = 2048,
     tasks: Annotated[
-        List[Task],
+        str,
         typer.Option(
-            help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)"
+            help="Space-separated benchmark tasks. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)"
         ),
-    ] = [Task.performance],
+    ] = "performance",
     energy_sample_runs: Annotated[
         int, typer.Option(help="Number of energy-tracked requests")
     ] = 10,
-    accuracy_tasks: Annotated[List[str], typer.Option(help="lm-eval tasks to run")] = [
-        "mmlu",
-        "gsm8k",
-        "hellaswag",
-    ],
+    accuracy_tasks: Annotated[
+        str, typer.Option(help="Space-separated lm-eval tasks to run")
+    ] = "mmlu gsm8k hellaswag",
     num_fewshot: Annotated[
         int, typer.Option(help="Few-shot examples for accuracy tasks")
     ] = 0,
@@ -124,15 +125,20 @@ def run(
     ] = 2048,
 ):
     """Run complete benchmarks across models and precisions."""
+    # Convert space-separated strings to lists
+    models_list = models.split()
+    precisions_list = precisions.split()
+    tasks_list = tasks.split()
+    accuracy_tasks_list = accuracy_tasks.split()
+
     # Convert task list to boolean flags
-    tasks_list = [t.value for t in tasks]
     enable_performance_tracking = "performance" in tasks_list
     enable_energy_tracking = "energy" in tasks_list
     enable_accuracy_tracking = "accuracy" in tasks_list
 
     args = _build_args(
-        models=list(models),
-        precisions=[p.value for p in precisions],
+        models=models_list,
+        precisions=precisions_list,
         output_dir=output_dir,
         quantized_models_dir=quantized_models_dir,
         num_warmup=num_warmup,
@@ -146,7 +152,7 @@ def run(
         enable_energy_tracking=enable_energy_tracking,
         energy_sample_runs=energy_sample_runs,
         enable_accuracy_tracking=enable_accuracy_tracking,
-        accuracy_tasks=list(accuracy_tasks),
+        accuracy_tasks=accuracy_tasks_list,
         num_fewshot=num_fewshot,
         accuracy_limit=accuracy_limit,
         accuracy_batch_size=accuracy_batch_size,
