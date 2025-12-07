@@ -12,11 +12,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = typer.Typer(help="SLiM-Eval: Quantize and benchmark LLMs for speed, memory, energy, and accuracy.")
+app = typer.Typer(
+    help="SLiM-Eval: Quantize and benchmark LLMs for speed, memory, energy, and accuracy."
+)
 
 
 class Precision(str, Enum):
     """Available precision modes."""
+
     fp16 = "fp16"
     int8 = "int8"
     int4 = "int4"
@@ -25,6 +28,7 @@ class Precision(str, Enum):
 
 class Task(str, Enum):
     """Available benchmark tasks."""
+
     performance = "performance"
     energy = "energy"
     accuracy = "accuracy"
@@ -45,36 +49,79 @@ def run(
     models: Annotated[List[str], typer.Option(help="HF model ids or local paths")],
     precisions: Annotated[
         List[Precision],
-        typer.Option(help="Precisions to evaluate: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)")
+        typer.Option(
+            help="Precisions to evaluate: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
+        ),
     ] = [Precision.fp16, Precision.int8, Precision.int4, Precision.gptq],
-    output_dir: Annotated[str, typer.Option(help="Directory to write results")] = "outputs",
-    quantized_models_dir: Annotated[str, typer.Option(help="Directory to store/load pre-quantized models")] = "quantized-models",
-    num_warmup: Annotated[int, typer.Option(help="Warmup requests before measuring")] = 2,
+    output_dir: Annotated[
+        str, typer.Option(help="Directory to write results")
+    ] = "outputs",
+    quantized_models_dir: Annotated[
+        str, typer.Option(help="Directory to store/load pre-quantized models")
+    ] = "quantized-models",
+    num_warmup: Annotated[
+        int, typer.Option(help="Warmup requests before measuring")
+    ] = 2,
     num_runs: Annotated[int, typer.Option(help="Number of measured requests")] = 10,
-    batch_size: Annotated[int, typer.Option(help="Concurrent requests per iteration")] = 1,
-    prompt: Annotated[str, typer.Option(help="Prompt used for latency tests")] = "Hello, world!",
-    max_new_tokens: Annotated[int, typer.Option(help="Max tokens to generate per request")] = 128,
-    gpu_memory_utilization: Annotated[float, typer.Option(help="vLLM GPU memory utilization fraction")] = 0.9,
-    max_model_len: Annotated[int, typer.Option(help="vLLM max model length (context window)")] = 8192,
+    batch_size: Annotated[
+        int, typer.Option(help="Concurrent requests per iteration")
+    ] = 1,
+    prompt: Annotated[
+        str, typer.Option(help="Prompt used for latency tests")
+    ] = "Hello, world!",
+    max_new_tokens: Annotated[
+        int, typer.Option(help="Max tokens to generate per request")
+    ] = 128,
+    gpu_memory_utilization: Annotated[
+        float, typer.Option(help="vLLM GPU memory utilization fraction")
+    ] = 0.9,
+    max_model_len: Annotated[
+        int, typer.Option(help="vLLM max model length (context window)")
+    ] = 8192,
     tasks: Annotated[
         List[Task],
-        typer.Option(help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)")
+        typer.Option(
+            help="Benchmark tasks to run. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)"
+        ),
     ] = [Task.performance],
-    energy_sample_runs: Annotated[int, typer.Option(help="Number of energy-tracked requests")] = 10,
-    accuracy_tasks: Annotated[
-        List[str],
-        typer.Option(help="lm-eval tasks to run")
-    ] = ["mmlu", "gsm8k", "hellaswag"],
-    num_fewshot: Annotated[int, typer.Option(help="Few-shot examples for accuracy tasks")] = 0,
-    accuracy_limit: Annotated[Optional[int], typer.Option(help="Limit examples per task for quick runs")] = None,
-    accuracy_batch_size: Annotated[int, typer.Option(help="Global lm-eval batch size")] = 32,
-    accuracy_batch_size_hellaswag: Annotated[int, typer.Option(help="Override batch size for hellaswag")] = 32,
-    accuracy_batch_size_gsm8k: Annotated[int, typer.Option(help="Override batch size for gsm8k")] = 32,
-    accuracy_batch_size_mmlu: Annotated[int, typer.Option(help="Override batch size for mmlu")] = 32,
-    calibration_dataset: Annotated[str, typer.Option(help="Calibration dataset for quantization")] = "HuggingFaceH4/ultrachat_200k",
-    calibration_split: Annotated[str, typer.Option(help="Dataset split for calibration")] = "train",
-    num_calibration_samples: Annotated[int, typer.Option(help="Number of calibration samples")] = 512,
-    max_sequence_length: Annotated[int, typer.Option(help="Max sequence length for calibration")] = 2048,
+    energy_sample_runs: Annotated[
+        int, typer.Option(help="Number of energy-tracked requests")
+    ] = 10,
+    accuracy_tasks: Annotated[List[str], typer.Option(help="lm-eval tasks to run")] = [
+        "mmlu",
+        "gsm8k",
+        "hellaswag",
+    ],
+    num_fewshot: Annotated[
+        int, typer.Option(help="Few-shot examples for accuracy tasks")
+    ] = 0,
+    accuracy_limit: Annotated[
+        Optional[int], typer.Option(help="Limit examples per task for quick runs")
+    ] = None,
+    accuracy_batch_size: Annotated[
+        int, typer.Option(help="Global lm-eval batch size")
+    ] = 32,
+    accuracy_batch_size_hellaswag: Annotated[
+        int, typer.Option(help="Override batch size for hellaswag")
+    ] = 32,
+    accuracy_batch_size_gsm8k: Annotated[
+        int, typer.Option(help="Override batch size for gsm8k")
+    ] = 32,
+    accuracy_batch_size_mmlu: Annotated[
+        int, typer.Option(help="Override batch size for mmlu")
+    ] = 32,
+    calibration_dataset: Annotated[
+        str, typer.Option(help="Calibration dataset for quantization")
+    ] = "HuggingFaceH4/ultrachat_200k",
+    calibration_split: Annotated[
+        str, typer.Option(help="Dataset split for calibration")
+    ] = "train",
+    num_calibration_samples: Annotated[
+        int, typer.Option(help="Number of calibration samples")
+    ] = 512,
+    max_sequence_length: Annotated[
+        int, typer.Option(help="Max sequence length for calibration")
+    ] = 2048,
 ):
     """Run complete benchmarks across models and precisions."""
     # Convert task list to boolean flags
@@ -118,10 +165,11 @@ def run(
 
 @app.command()
 def analyze(
-    output_dir: Annotated[str, typer.Option(help="Directory containing results")] = "outputs",
+    output_dir: Annotated[
+        str, typer.Option(help="Directory containing results")
+    ] = "outputs",
     accuracy_tasks: Annotated[
-        List[str],
-        typer.Option(help="Accuracy tasks to include in analysis")
+        List[str], typer.Option(help="Accuracy tasks to include in analysis")
     ] = ["mmlu", "gsm8k", "hellaswag"],
 ):
     """Analyze and visualize previously saved results."""
