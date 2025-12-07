@@ -115,6 +115,7 @@ class SLiMEvaluator:
                     ),
                 ],
                 "method": "gptq_smoothquant",
+                "scheme_name": "SmoothQuant+GPTQ (W8A8)",
             },
             "int4": {
                 "recipe": [
@@ -126,6 +127,7 @@ class SLiMEvaluator:
                     ),
                 ],
                 "method": "gptq_smoothquant",
+                "scheme_name": "SmoothQuant+GPTQ (W4A16)",
             },
             "gptq": {
                 "recipe": GPTQModifier(
@@ -134,6 +136,7 @@ class SLiMEvaluator:
                     ignore=["lm_head", "embed_tokens", "norm", "rotary_emb"],
                 ),
                 "method": "gptq_only",
+                "scheme_name": "GPTQ (W4A16)",
             },
         }
 
@@ -397,9 +400,7 @@ class SLiMEvaluator:
                     model_path = model_name
                     dtype = "auto"
                     quantization = (
-                        precision
-                        if precision in ["int8", "int4", "gptq", "awq"]
-                        else None
+                        precision if precision in ["int8", "int4", "gptq"] else None
                     )
                     logger.warning(
                         f"Using base model with on-the-fly quantization: {precision}"
@@ -621,7 +622,7 @@ class SLiMEvaluator:
             for i in tqdm(range(self.args.energy_sample_runs), desc="Energy tracking"):
                 prompt = test_prompts[i % len(test_prompts)]
                 prompts_batch = [prompt]
-                outputs = llm.generate(prompts_batch, sampling_params)
+                llm.generate(prompts_batch, sampling_params)
 
             end_time = time.time()
 
@@ -667,7 +668,7 @@ class SLiMEvaluator:
             logger.error(f"Energy tracking failed: {e}", exc_info=True)
             try:
                 pynvml.nvmlShutdown()
-            except:
+            except Exception:
                 pass
             return {
                 "energy_kwh": 0,
@@ -683,7 +684,11 @@ class SLiMEvaluator:
             }
 
     def benchmark_accuracy(self, model_name: str, precision: str) -> Dict:
-        """Evaluate model accuracy using lm-evaluation-harness with vLLM backend."""
+        """Evaluate model accuracy using lm-evaluation-harness with vLLM backend.
+
+        Runs each requested task sequentially so we can apply per-task batch sizes
+        to reduce OOM risk (e.g., a smaller batch for MMLU while keeping others larger).
+        """
         logger.info("=" * 60)
         logger.info("ACCURACY EVALUATION")
         logger.info("=" * 60)
@@ -727,37 +732,59 @@ class SLiMEvaluator:
                     "int8",
                     "int4",
                     "gptq",
-                    "awq",
                 ]:
                     model_args += f",quantization={precision}"
 
-            results = evaluator.simple_evaluate(
-                model="vllm",
-                model_args=model_args,
-                tasks=self.args.accuracy_tasks,
-                num_fewshot=self.args.num_fewshot,
-                batch_size=self.args.accuracy_batch_size,
-                limit=self.args.accuracy_limit,
-                log_samples=False,
-            )
+            # Helper to resolve per-task batch size
+            def resolve_batch_size(task: str) -> int:
+                task = task.lower()
+                if (
+                    task == "hellaswag"
+                    and self.args.accuracy_batch_size_hellaswag is not None
+                ):
+                    return self.args.accuracy_batch_size_hellaswag
+                if task == "gsm8k" and self.args.accuracy_batch_size_gsm8k is not None:
+                    return self.args.accuracy_batch_size_gsm8k
+                if task == "mmlu" and self.args.accuracy_batch_size_mmlu is not None:
+                    return self.args.accuracy_batch_size_mmlu
+                return self.args.accuracy_batch_size
 
             accuracy_results = {}
-            for task_name, task_results in results["results"].items():
-                if "acc" in task_results:
-                    accuracy_results[f"{task_name}_accuracy"] = task_results["acc"]
-                elif "acc_norm" in task_results:
-                    accuracy_results[f"{task_name}_accuracy"] = task_results["acc_norm"]
-                elif "exact_match" in task_results:
-                    accuracy_results[f"{task_name}_accuracy"] = task_results[
-                        "exact_match"
-                    ]
-                elif "pass@1" in task_results:
-                    accuracy_results[f"{task_name}_accuracy"] = task_results["pass@1"]
-                else:
-                    for key, value in task_results.items():
-                        if isinstance(value, (int, float)) and 0 <= value <= 1:
-                            accuracy_results[f"{task_name}_accuracy"] = value
-                            break
+            for task in self.args.accuracy_tasks:
+                bs = resolve_batch_size(task)
+                logger.info(f"Running accuracy task '{task}' with batch_size={bs}")
+
+                results = evaluator.simple_evaluate(
+                    model="vllm",
+                    model_args=model_args,
+                    tasks=[task],
+                    num_fewshot=self.args.num_fewshot,
+                    batch_size=bs,
+                    limit=self.args.accuracy_limit,
+                    log_samples=False,
+                )
+
+                # Extract the results for this single task
+                for task_name, task_results in results["results"].items():
+                    if "acc" in task_results:
+                        accuracy_results[f"{task_name}_accuracy"] = task_results["acc"]
+                    elif "acc_norm" in task_results:
+                        accuracy_results[f"{task_name}_accuracy"] = task_results[
+                            "acc_norm"
+                        ]
+                    elif "exact_match" in task_results:
+                        accuracy_results[f"{task_name}_accuracy"] = task_results[
+                            "exact_match"
+                        ]
+                    elif "pass@1" in task_results:
+                        accuracy_results[f"{task_name}_accuracy"] = task_results[
+                            "pass@1"
+                        ]
+                    else:
+                        for key, value in task_results.items():
+                            if isinstance(value, (int, float)) and 0 <= value <= 1:
+                                accuracy_results[f"{task_name}_accuracy"] = value
+                                break
 
             logger.info("Accuracy results:")
             for task, acc in accuracy_results.items():
@@ -784,6 +811,13 @@ class SLiMEvaluator:
         results = {
             "model": model_name,
             "precision": precision,
+            "quantization_scheme": (
+                "FP16"
+                if precision == "fp16"
+                else self.quantization_configs.get(precision, {}).get(
+                    "scheme_name", precision.upper()
+                )
+            ),
             "timestamp": datetime.now().isoformat(),
             "num_parameters": model_size_info["num_parameters"],
             "num_parameters_b": model_size_info["num_parameters_b"],
@@ -838,6 +872,7 @@ class SLiMEvaluator:
         base_columns = [
             "model",
             "precision",
+            "quantization_scheme",
             "timestamp",
             "num_parameters",
             "num_parameters_b",
@@ -1356,7 +1391,9 @@ def parse_args():
         nargs="+",
         default=["fp16", "int8", "int4"],
         choices=["fp16", "int8", "int4", "gptq"],
-        help="Precisions to test",
+        help=(
+            "Precisions to test: fp16 (baseline), int8/int4 (SmoothQuant+GPTQ), gptq (GPTQ-only)"
+        ),
     )
 
     # Benchmark configuration
@@ -1413,8 +1450,26 @@ def parse_args():
     parser.add_argument(
         "--accuracy-batch-size",
         type=int,
-        default=1,
+        default=32,
         help="Batch size used by lm-eval during accuracy evaluation (reduce to avoid GPU OOM)",
+    )
+    parser.add_argument(
+        "--accuracy-batch-size-hellaswag",
+        type=int,
+        default=None,
+        help="Override batch size for Hellaswag only (falls back to --accuracy-batch-size)",
+    )
+    parser.add_argument(
+        "--accuracy-batch-size-gsm8k",
+        type=int,
+        default=None,
+        help="Override batch size for GSM8K only (falls back to --accuracy-batch-size)",
+    )
+    parser.add_argument(
+        "--accuracy-batch-size-mmlu",
+        type=int,
+        default=None,
+        help="Override batch size for MMLU only (falls back to --accuracy-batch-size)",
     )
 
     # Energy configuration (controlled via --benchmarks)
