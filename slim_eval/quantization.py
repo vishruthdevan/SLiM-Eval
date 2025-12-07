@@ -1,5 +1,6 @@
 """Quantization logic for SLiM-Eval."""
 
+import gc
 import logging
 from pathlib import Path
 from typing import Dict
@@ -172,8 +173,15 @@ class QuantizationManager:
             tokenizer.save_pretrained(output_dir)
             logger.info(f"Quantization complete: {output_dir}")
 
+            # Thorough cleanup to free GPU memory
+            logger.info("Cleaning up GPU memory...")
             del model
+            del tokenizer
+            del ds
+            gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            logger.info("GPU memory cleanup complete")
         except Exception as e:
             logger.error(f"Quantization failed: {e}", exc_info=True)
