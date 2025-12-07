@@ -5,51 +5,43 @@ description = "Complete Small Language Model Evaluation Framework - Tracking Lat
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    # Core ML Frameworks
-    "torch>=2.8.0",
-    "torchvision>=0.20.0",
-    "torchaudio>=2.5.0",
-    
+    # Core PyTorch
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "torchaudio==2.8.0",
+
     # LLM Inference & Quantization
-    "vllm>=0.6.0",
-    "llmcompressor>=0.7.0",
-    "transformers>=4.40.0",
-    "accelerate>=0.30.0",
-    "tokenizers>=0.19.0",
-    
+    "vllm==0.11.0",
+    "llmcompressor==0.7.1",
+    "transformers==4.55.2",
+    "accelerate==1.10.0",
+    "tokenizers==0.21.4",
+
     # Evaluation & Benchmarking
-    "lm-eval>=0.4.0",
-    
-    # Energy Tracking
-    "codecarbon>=2.3.0",
-    
+    "lm-eval==0.4.9.2",
+
+    # GPU Monitoring
+    "nvidia-ml-py==12.575.51",
+    "pynvml==12.0.0",
+
     # Data Processing & Analysis
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    
+    "pandas==2.3.3",
+    "numpy==2.2.6",
+
     # Visualization
-    "matplotlib>=3.7.0",
-    "seaborn>=0.12.0",
-    
+    "matplotlib==3.10.7",
+    "seaborn==0.13.2",
+
     # Progress & Utilities
-    "tqdm>=4.65.0",
-    "psutil>=5.9.0",
-    
-    # Jupyter Support (optional but recommended)
-    "jupyter>=1.0.0",
-    "ipykernel>=6.25.0",
-    "ipywidgets>=8.1.0",
+    "tqdm==4.67.1",
+    "psutil==7.1.3",    
+
+    # Jupyter Support moved to dev extras
 ]
 
-
-[tool.uv]
-# CUDA 12.8 PyTorch index
-[[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-name = "pytorch-cu128"
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-torchvision = { index = "pytorch-cu128" }
-torchaudio = { index = "pytorch-cu128" }
+[project.optional-dependencies]
+dev = [
+    "jupyter==1.0.0",
+    "ipykernel==6.25.0",
+    "ipywidgets==8.1.0",
+]
