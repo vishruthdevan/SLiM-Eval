@@ -77,7 +77,7 @@ def run(
     ] = 0.9,
     max_model_len: Annotated[
         int, typer.Option(help="vLLM max model length (context window)")
-    ] = 8192,
+    ] = 2048,
     tasks: Annotated[
         List[Task],
         typer.Option(
