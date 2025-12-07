@@ -116,7 +116,7 @@ def run(
     ] = "HuggingFaceH4/ultrachat_200k",
     calibration_split: Annotated[
         str, typer.Option(help="Dataset split for calibration")
-    ] = "train",
+    ] = "train_sft",
     num_calibration_samples: Annotated[
         int, typer.Option(help="Number of calibration samples")
     ] = 512,
