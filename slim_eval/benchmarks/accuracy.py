@@ -70,16 +70,10 @@ class AccuracyBenchmark(BaseBenchmark):
                 else:
                     dtype = "float16"
 
-                # Add buffer to max_model_len to prevent token overflow.
-                # Use a dynamic buffer based on requested generation length,
-                # since vLLM may need extra room for sampling/logprobs.
-                buffer = max(128, getattr(self.args, "max_new_tokens", 256) + 1)
-                max_len = self.args.max_model_len + buffer
-
                 model_args = (
                     f"pretrained={model_path},dtype={dtype},"
                     f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
-                    f"trust_remote_code=True,max_model_len={max_len},"
+                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
                     f"tensor_parallel_size=1"
                 )
             else:
@@ -96,14 +90,10 @@ class AccuracyBenchmark(BaseBenchmark):
                         f"Using base model with on-the-fly quantization: {precision}"
                     )
 
-                # Add buffer to max_model_len to prevent token overflow (dynamic)
-                buffer = max(128, getattr(self.args, "max_new_tokens", 256) + 1)
-                max_len = self.args.max_model_len + buffer
-
                 model_args = (
                     f"pretrained={model_path},dtype=auto,"
                     f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
-                    f"trust_remote_code=True,max_model_len={max_len},"
+                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
                     f"tensor_parallel_size=1"
                 )
 
