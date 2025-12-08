@@ -18,25 +18,76 @@ logger = logging.getLogger(__name__)
 class ResultsAnalyzer:
     """Analyzes and visualizes benchmark results."""
 
-    def __init__(self, output_dir: Path, results_csv: Path, accuracy_tasks: list):
+    def __init__(self, output_dir: Path, accuracy_tasks: list):
         """Initialize results analyzer.
 
         Args:
             output_dir: Directory for saving analysis outputs.
-            results_csv: Path to the results CSV file.
             accuracy_tasks: List of accuracy task names.
         """
         self.output_dir = output_dir
-        self.results_csv = results_csv
         self.accuracy_tasks = accuracy_tasks
+
+    def load_results_from_json(self) -> pd.DataFrame:
+        """Load all benchmark results from JSON files in model directories.
+
+        Returns:
+            DataFrame with all results combined.
+        """
+        all_results = []
+
+        # Find all model_precision directories
+        for model_dir in self.output_dir.iterdir():
+            if not model_dir.is_dir():
+                continue
+
+            # Skip if it doesn't look like a model_precision directory
+            if not any(f.suffix == ".json" for f in model_dir.iterdir() if f.is_file()):
+                continue
+
+            result = {}
+
+            # Load performance.json
+            performance_file = model_dir / "performance.json"
+            if performance_file.exists():
+                with open(performance_file, "r") as f:
+                    result.update(json.load(f))
+
+            # Load energy.json
+            energy_file = model_dir / "energy.json"
+            if energy_file.exists():
+                with open(energy_file, "r") as f:
+                    energy_data = json.load(f)
+                    # Add energy fields to result
+                    for key, value in energy_data.items():
+                        if key not in result:  # Avoid overwriting metadata
+                            result[key] = value
+
+            # Load accuracy JSON files
+            for task in self.accuracy_tasks:
+                accuracy_file = model_dir / f"{task}.json"
+                if accuracy_file.exists():
+                    with open(accuracy_file, "r") as f:
+                        accuracy_data = json.load(f)
+                        result[f"{task}_accuracy"] = accuracy_data.get("accuracy")
+
+            if result:
+                all_results.append(result)
+
+        if not all_results:
+            logger.warning("No results found in output directory")
+            return pd.DataFrame()
+
+        return pd.DataFrame(all_results)
 
     def analyze_results(self):
         """Run complete analysis suite."""
-        if not self.results_csv.exists():
-            logger.warning("No results file found")
+        results_df = self.load_results_from_json()
+
+        if results_df.empty:
+            logger.warning("No results to analyze")
             return
 
-        results_df = pd.read_csv(self.results_csv)
         logger.info("#" * 70)
         logger.info("COMPLETE RESULTS SUMMARY")
         logger.info("#" * 70)
