@@ -93,7 +93,25 @@ class SLiMEvaluator:
 
             if precision == "fp16":
                 model_path = model_name
-                dtype = "float16"
+                model_lower = model_name.lower()
+
+                # Model-specific dtype based on HuggingFace documentation
+                # Llama 3.2: Uses bfloat16 (torch.bfloat16 in examples)
+                # Mistral 7B: Uses bfloat16 (torch.bfloat16 in examples)
+                # Gemma 2/3: Uses bfloat16 (native weights in bfloat16)
+                # Phi-3: Uses "auto" which resolves to bfloat16
+                # Qwen2.5: Uses "auto" which resolves to bfloat16
+
+                if any(
+                    x in model_lower
+                    for x in ["gemma", "llama", "mistral", "phi", "qwen"]
+                ):
+                    dtype = "bfloat16"
+                    logger.info(
+                        f"Using bfloat16 for {model_name} (recommended by model authors)"
+                    )
+                else:
+                    dtype = "float16"
                 quantization = None
             else:
                 model_short_name = model_name.split("/")[-1]
