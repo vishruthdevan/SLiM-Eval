@@ -75,7 +75,7 @@ class PerformanceBenchmark(BaseBenchmark):
 
         if torch.cuda.is_available():
             torch.cuda.synchronize()
-            baseline_memory_mb = get_gpu_memory_mb()
+            baseline_memory_mb = get_gpu_memory_mb(self.args.gpu_index)
             logger.info(
                 f"Baseline GPU memory (model + KV cache): {baseline_memory_mb:.2f} MB"
             )
@@ -103,8 +103,8 @@ class PerformanceBenchmark(BaseBenchmark):
             end_time = time.time()
 
             batch_latency = end_time - start_time
-            peak_mem = get_peak_gpu_memory_mb()
-            avg_mem = get_gpu_memory_mb()
+            peak_mem = get_peak_gpu_memory_mb(self.args.gpu_index)
+            avg_mem = get_gpu_memory_mb(self.args.gpu_index)
             per_request_latency = batch_latency / current_batch_size
             batch_tokens = sum(len(output.outputs[0].token_ids) for output in outputs)
 

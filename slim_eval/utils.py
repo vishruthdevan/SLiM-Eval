@@ -30,7 +30,7 @@ def clear_cache() -> None:
         torch.cuda.synchronize()
 
 
-def get_gpu_memory_mb() -> float:
+def get_gpu_memory_mb(gpu_index: int = 0) -> float:
     """Get current GPU memory usage in MB.
 
     Returns:
@@ -39,24 +39,24 @@ def get_gpu_memory_mb() -> float:
     if torch.cuda.is_available():
         try:
             if PYNVML_AVAILABLE:
-                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
                 info = pynvml.nvmlDeviceGetMemoryInfo(handle)
                 return info.used / (1024**2)
             else:
-                return torch.cuda.memory_allocated() / (1024**2)
+                return torch.cuda.memory_allocated(gpu_index) / (1024**2)
         except Exception:
-            return torch.cuda.memory_allocated() / (1024**2)
+            return torch.cuda.memory_allocated(gpu_index) / (1024**2)
     return 0.0
 
 
-def get_peak_gpu_memory_mb() -> float:
+def get_peak_gpu_memory_mb(gpu_index: int = 0) -> float:
     """Get peak GPU memory usage in MB.
 
     Returns:
         Peak GPU memory usage in megabytes.
     """
     if torch.cuda.is_available():
-        return torch.cuda.max_memory_allocated() / (1024**2)
+        return torch.cuda.max_memory_allocated(gpu_index) / (1024**2)
     return 0.0
 
 
