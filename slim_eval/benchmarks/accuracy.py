@@ -70,9 +70,11 @@ class AccuracyBenchmark(BaseBenchmark):
                 else:
                     dtype = "float16"
 
-                # Add buffer to max_model_len to prevent token overflow
-                # vLLM needs headroom for generation beyond prompt length
-                max_len = self.args.max_model_len + 128
+                # Add buffer to max_model_len to prevent token overflow.
+                # Use a dynamic buffer based on requested generation length,
+                # since vLLM may need extra room for sampling/logprobs.
+                buffer = max(128, getattr(self.args, "max_new_tokens", 256) + 1)
+                max_len = self.args.max_model_len + buffer
 
                 model_args = (
                     f"pretrained={model_path},dtype={dtype},"
@@ -94,8 +96,9 @@ class AccuracyBenchmark(BaseBenchmark):
                         f"Using base model with on-the-fly quantization: {precision}"
                     )
 
-                # Add buffer to max_model_len to prevent token overflow
-                max_len = self.args.max_model_len + 128
+                # Add buffer to max_model_len to prevent token overflow (dynamic)
+                buffer = max(128, getattr(self.args, "max_new_tokens", 256) + 1)
+                max_len = self.args.max_model_len + buffer
 
                 model_args = (
                     f"pretrained={model_path},dtype=auto,"
