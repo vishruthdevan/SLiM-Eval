@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from lm_eval import evaluator as lm_evaluator
 
+from ..utils import clear_cache
 from .base import BaseBenchmark
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,10 @@ class AccuracyBenchmark(BaseBenchmark):
         logger.info(f"Few-shot: {self.args.num_fewshot}")
         if self.args.accuracy_limit:
             logger.info(f"Limit: {self.args.accuracy_limit} examples per task")
+
+        # Aggressive memory clearing before accuracy evaluation
+        logger.info("Clearing GPU memory before accuracy evaluation...")
+        clear_cache()
 
         try:
             if precision == "fp16":
