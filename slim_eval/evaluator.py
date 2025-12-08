@@ -261,10 +261,14 @@ class SLiMEvaluator:
                 results.update(
                     self.performance_benchmark.run(llm, model_name, precision)
                 )
+                # Save performance results immediately
+                self.save_results_to_json(model_name, precision, results)
 
             # Run energy benchmark
             if self.args.enable_energy_tracking:
                 results.update(self.energy_benchmark.run(llm, model_name, precision))
+                # Save energy results immediately
+                self.save_results_to_json(model_name, precision, results)
 
             # Clean up vLLM instance before accuracy testing
             del llm
@@ -274,6 +278,8 @@ class SLiMEvaluator:
             # Run accuracy benchmark (creates its own vLLM instance)
             if self.args.enable_accuracy_tracking:
                 results.update(self.accuracy_benchmark.run(None, model_name, precision))
+                # Save accuracy results immediately
+                self.save_results_to_json(model_name, precision, results)
             else:
                 results.update(
                     {
@@ -398,8 +404,7 @@ class SLiMEvaluator:
                 results = self.run_complete_benchmark(model_name, precision)
                 if results:
                     all_results.append(results)
-                    self.save_results_to_json(model_name, precision, results)
-                    logger.info(f"Results saved for {config_id}")
+                    logger.info(f"All benchmarks completed for {config_id}")
                 clear_cache()
                 time.sleep(5)
 
