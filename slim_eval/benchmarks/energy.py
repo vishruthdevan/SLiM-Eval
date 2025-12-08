@@ -9,6 +9,7 @@ import numpy as np
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
+from ..utils import clear_cache
 from .base import BaseBenchmark
 
 try:
@@ -136,6 +137,10 @@ class EnergyBenchmark(BaseBenchmark):
                 f"Energy: {results['energy_kwh'] * 1000:.4f} Wh | Avg Power: {results['avg_power_watts']:.2f}W | "
                 f"Range: {results['min_power_watts']:.1f}-{results['max_power_watts']:.1f}W"
             )
+
+            # Clear GPU memory after energy benchmark
+            clear_cache()
+
             return results
         except Exception as e:
             logger.error(f"Energy tracking failed: {e}", exc_info=True)
@@ -143,6 +148,10 @@ class EnergyBenchmark(BaseBenchmark):
                 pynvml.nvmlShutdown()
             except Exception:
                 pass
+
+            # Clear GPU memory after energy benchmark error
+            clear_cache()
+
             return {
                 "energy_kwh": 0,
                 "energy_joules": 0,

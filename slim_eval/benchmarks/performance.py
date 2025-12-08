@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 from vllm import LLM, SamplingParams
 
-from ..utils import get_gpu_memory_mb, get_peak_gpu_memory_mb
+from ..utils import clear_cache, get_gpu_memory_mb, get_peak_gpu_memory_mb
 from .base import BaseBenchmark
 
 try:
@@ -152,4 +152,8 @@ class PerformanceBenchmark(BaseBenchmark):
         logger.info(
             f"Latency: {results['mean_latency_s']:.4f}s | Memory: {results['mean_peak_mem_mb']:.2f}MB"
         )
+
+        # Clear GPU memory after performance benchmark
+        clear_cache()
+
         return results
