@@ -70,10 +70,14 @@ class AccuracyBenchmark(BaseBenchmark):
                 else:
                     dtype = "float16"
 
+                # Add buffer to max_model_len to prevent token overflow
+                # vLLM needs headroom for generation beyond prompt length
+                max_len = self.args.max_model_len + 128
+
                 model_args = (
                     f"pretrained={model_path},dtype={dtype},"
                     f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
-                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
+                    f"trust_remote_code=True,max_model_len={max_len},"
                     f"tensor_parallel_size=1"
                 )
             else:
@@ -90,10 +94,13 @@ class AccuracyBenchmark(BaseBenchmark):
                         f"Using base model with on-the-fly quantization: {precision}"
                     )
 
+                # Add buffer to max_model_len to prevent token overflow
+                max_len = self.args.max_model_len + 128
+
                 model_args = (
                     f"pretrained={model_path},dtype=auto,"
                     f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
-                    f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
+                    f"trust_remote_code=True,max_model_len={max_len},"
                     f"tensor_parallel_size=1"
                 )
 
