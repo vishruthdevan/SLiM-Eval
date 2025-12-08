@@ -351,7 +351,8 @@ class SLiMEvaluator:
                     all_results.append(results)
                     existing_df = pd.read_csv(self.results_csv)
                     columns = existing_df.columns.tolist()
-                    results_df = pd.DataFrame([results], columns=columns)
+                    # Build from dict then align to existing CSV columns to avoid all-NaN rows
+                    results_df = pd.DataFrame([results]).reindex(columns=columns)
                     results_df.to_csv(
                         self.results_csv, mode="a", header=False, index=False
                     )
