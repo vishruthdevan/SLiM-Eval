@@ -313,8 +313,7 @@ class SLiMEvaluator:
             "size_gb_fp16": results.get("size_gb_fp16"),
         }
 
-        # Save performance.json
-        performance_data = metadata.copy()
+        # Save performance.json (only if performance data exists)
         performance_keys = [
             "mean_latency_s",
             "median_latency_s",
@@ -325,17 +324,20 @@ class SLiMEvaluator:
             "mean_avg_mem_mb",
             "tokens_per_second",
         ]
-        for key in performance_keys:
-            if key in results:
-                performance_data[key] = results[key]
+        has_performance_data = any(key in results for key in performance_keys)
 
-        performance_file = model_dir / "performance.json"
-        with open(performance_file, "w") as f:
-            json.dump(performance_data, f, indent=2)
-        logger.info(f"Saved performance results: {performance_file}")
+        if has_performance_data:
+            performance_data = metadata.copy()
+            for key in performance_keys:
+                if key in results:
+                    performance_data[key] = results[key]
 
-        # Save energy.json
-        energy_data = metadata.copy()
+            performance_file = model_dir / "performance.json"
+            with open(performance_file, "w") as f:
+                json.dump(performance_data, f, indent=2)
+            logger.info(f"Saved performance results: {performance_file}")
+
+        # Save energy.json (only if energy data exists)
         energy_keys = [
             "energy_kwh",
             "energy_joules",
@@ -346,14 +348,18 @@ class SLiMEvaluator:
             "std_power_watts",
             "energy_per_query_j",
         ]
-        for key in energy_keys:
-            if key in results:
-                energy_data[key] = results[key]
+        has_energy_data = any(key in results for key in energy_keys)
 
-        energy_file = model_dir / "energy.json"
-        with open(energy_file, "w") as f:
-            json.dump(energy_data, f, indent=2)
-        logger.info(f"Saved energy results: {energy_file}")
+        if has_energy_data:
+            energy_data = metadata.copy()
+            for key in energy_keys:
+                if key in results:
+                    energy_data[key] = results[key]
+
+            energy_file = model_dir / "energy.json"
+            with open(energy_file, "w") as f:
+                json.dump(energy_data, f, indent=2)
+            logger.info(f"Saved energy results: {energy_file}")
 
         # Save accuracy JSON files (one per task)
         for task in self.args.accuracy_tasks:
