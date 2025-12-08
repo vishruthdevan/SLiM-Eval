@@ -178,8 +178,28 @@ class SLiMEvaluator:
 
             logger.info("Model loaded successfully")
             if torch.cuda.is_available():
-                allocated = torch.cuda.memory_allocated() / 1024**3
-                logger.info(f"GPU Memory allocated: {allocated:.2f}GB")
+                # Check memory across all GPUs
+                total_allocated = 0
+                for device_id in range(torch.cuda.device_count()):
+                    allocated = torch.cuda.memory_allocated(device_id) / 1024**3
+                    total_allocated += allocated
+                    if allocated > 0:
+                        logger.info(
+                            f"GPU {device_id} Memory allocated: {allocated:.2f}GB"
+                        )
+
+                if total_allocated > 0:
+                    logger.info(f"Total GPU Memory allocated: {total_allocated:.2f}GB")
+                else:
+                    # Fallback: show reserved memory (which vLLM uses)
+                    total_reserved = sum(
+                        torch.cuda.memory_reserved(i) / 1024**3
+                        for i in range(torch.cuda.device_count())
+                    )
+                    if total_reserved > 0:
+                        logger.info(
+                            f"Total GPU Memory reserved: {total_reserved:.2f}GB"
+                        )
 
             return llm
         except Exception as e:
