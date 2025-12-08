@@ -13,6 +13,9 @@ from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
 from llmcompressor.utils import dispatch_for_generation
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+# Configure torch dynamo to support quantization with scalar outputs
+torch._dynamo.config.capture_scalar_outputs = True
+
 logger = logging.getLogger(__name__)
 
 
