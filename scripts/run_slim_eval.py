@@ -357,7 +357,20 @@ class SLiMEvaluator:
 
             if precision == "fp16":
                 model_path = model_name
-                dtype = "float16"
+                model_lower = model_name.lower()
+
+                # Model-specific dtype based on HuggingFace documentation
+                # Use bfloat16 for: Llama, Mistral, Gemma, Phi, Qwen
+                if any(
+                    x in model_lower
+                    for x in ["gemma", "llama", "mistral", "phi", "qwen"]
+                ):
+                    dtype = "bfloat16"
+                    logger.info(
+                        f"Using bfloat16 for {model_name} (recommended by model authors)"
+                    )
+                else:
+                    dtype = "float16"
                 quantization = None
             else:
                 model_short_name = model_name.split("/")[-1]
@@ -700,8 +713,20 @@ class SLiMEvaluator:
         try:
             if precision == "fp16":
                 model_path = model_name
+                model_lower = model_name.lower()
+
+                # Model-specific dtype based on HuggingFace documentation
+                # Use bfloat16 for: Llama, Mistral, Gemma, Phi, Qwen
+                if any(
+                    x in model_lower
+                    for x in ["gemma", "llama", "mistral", "phi", "qwen"]
+                ):
+                    dtype = "bfloat16"
+                else:
+                    dtype = "float16"
+
                 model_args = (
-                    f"pretrained={model_path},dtype=float16,"
+                    f"pretrained={model_path},dtype={dtype},"
                     f"gpu_memory_utilization={self.args.gpu_memory_utilization},"
                     f"trust_remote_code=True,max_model_len={self.args.max_model_len},"
                     f"tensor_parallel_size=1"
