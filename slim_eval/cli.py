@@ -123,6 +123,9 @@ def run(
     max_sequence_length: Annotated[
         int, typer.Option(help="Max sequence length for calibration")
     ] = 2048,
+    gpu_index: Annotated[
+        int, typer.Option(help="Select NVIDIA GPU index to use (0-based)")
+    ] = 0,
 ):
     """Run complete benchmarks across models and precisions."""
     # Convert space-separated strings to lists
@@ -163,6 +166,7 @@ def run(
         calibration_split=calibration_split,
         num_calibration_samples=num_calibration_samples,
         max_sequence_length=max_sequence_length,
+        gpu_index=gpu_index,
     )
 
     evaluator = SLiMEvaluator(args)

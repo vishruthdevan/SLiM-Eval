@@ -55,10 +55,19 @@ class SLiMEvaluator:
         logger.info(f"Precisions: {args.precisions}")
 
         if torch.cuda.is_available():
-            logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+            # Select GPU
+            try:
+                import os
+
+                torch.cuda.set_device(self.args.gpu_index)
+                os.environ["CUDA_VISIBLE_DEVICES"] = str(self.args.gpu_index)
+            except Exception as e:
+                logger.warning(f"Failed to set GPU index {self.args.gpu_index}: {e}")
+
+            logger.info(f"GPU: {torch.cuda.get_device_name(self.args.gpu_index)}")
             logger.info(f"CUDA version: {torch.version.cuda}")
             logger.info(
-                f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB"
+                f"GPU Memory: {torch.cuda.get_device_properties(self.args.gpu_index).total_memory / 1024**3:.2f} GB"
             )
         else:
             logger.warning("CUDA not available")
