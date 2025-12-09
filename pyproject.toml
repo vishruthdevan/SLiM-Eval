@@ -49,3 +49,10 @@ dev = [
 
 [project.scripts]
 slim-eval = "slim_eval.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["slim_eval", "slim_eval.benchmarks"]
