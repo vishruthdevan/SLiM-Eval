@@ -50,12 +50,12 @@ def run(
         str,
         typer.Option(help="Space-separated HF model ids or local paths"),
     ] = "meta-llama/Llama-3.2-3B-Instruct",
-    precisions: Annotated[
-        str,
+    precision: Annotated[
+        Precision,
         typer.Option(
-            help="Space-separated precisions: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
+            help="Precision mode: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
         ),
-    ] = "fp16 int8 int4 gptq",
+    ] = Precision.fp16,
     output_dir: Annotated[
         str, typer.Option(help="Directory to write results")
     ] = "outputs",
@@ -130,7 +130,6 @@ def run(
     """Run complete benchmarks across models and precisions."""
     # Convert space-separated strings to lists
     models_list = models.split()
-    precisions_list = precisions.split()
     tasks_list = tasks.split()
     accuracy_tasks_list = accuracy_tasks.split()
 
@@ -141,7 +140,7 @@ def run(
 
     args = _build_args(
         models=models_list,
-        precisions=precisions_list,
+        precision=precision.value,
         output_dir=output_dir,
         quantized_models_dir=quantized_models_dir,
         num_warmup=num_warmup,
