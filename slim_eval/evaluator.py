@@ -157,22 +157,21 @@ class SLiMEvaluator:
                             f"Using newly quantized model from: {quantized_path}"
                         )
                     else:
-                        logger.warning(
-                            "Quantization failed, falling back to on-the-fly quantization"
+                        logger.error(
+                            f"Quantization failed for {model_name} with precision {precision}"
                         )
-                        model_path = model_name
-                        dtype = "auto"
-                        quantization = (
-                            precision if precision in ["int8", "int4", "gptq"] else None
+                        logger.error(
+                            "Quantized model directory does not exist or is incomplete."
+                        )
+                        raise RuntimeError(
+                            f"Quantization failed: Could not create valid quantized model at {quantized_path}"
                         )
                 else:
-                    model_path = model_name
-                    dtype = "auto"
-                    quantization = (
-                        precision if precision in ["int8", "int4", "gptq"] else None
+                    logger.error(
+                        f"use_quantized_dir=False is not supported. Quantization is required for {precision} precision."
                     )
-                    logger.warning(
-                        f"Using base model with on-the-fly quantization: {precision}"
+                    raise RuntimeError(
+                        f"Cannot load model in {precision} precision without quantization"
                     )
 
             llm = LLM(
