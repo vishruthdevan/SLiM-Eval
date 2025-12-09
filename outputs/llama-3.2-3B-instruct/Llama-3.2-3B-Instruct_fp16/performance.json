@@ -1,0 +1,17 @@
+{
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-08T23:07:57.326858",
+  "num_parameters": 3958898688,
+  "num_parameters_b": 3.958898688,
+  "size_gb_fp16": 7.3740234375,
+  "mean_latency_s": 0.21523508167266844,
+  "median_latency_s": 0.21409940719604492,
+  "p95_latency_s": 0.21785634756088257,
+  "p99_latency_s": 0.2820170323053996,
+  "std_latency_s": 0.007517101139201789,
+  "mean_peak_mem_mb": 75422.625,
+  "mean_avg_mem_mb": 75424.313,
+  "tokens_per_second": 1189.2299248375898
+}

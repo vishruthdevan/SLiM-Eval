@@ -1,0 +1,11 @@
+{
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-08T22:17:07.069584",
+  "num_parameters": 3958898688,
+  "num_parameters_b": 3.958898688,
+  "size_gb_fp16": 7.3740234375,
+  "task": "hellaswag",
+  "accuracy": 0.5277833100975902
+}
