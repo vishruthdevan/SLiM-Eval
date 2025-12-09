@@ -60,41 +60,42 @@ def run(
         str, typer.Option(help="Directory to write results")
     ] = "outputs",
     quantized_models_dir: Annotated[
-        str, typer.Option(help="Directory to store/load pre-quantized models")
+        str, typer.Option(help="Directory to write quantized models to")
     ] = "quantized-models",
-    num_warmup: Annotated[
-        int, typer.Option(help="Warmup requests before measuring")
-    ] = 10,
-    num_runs: Annotated[int, typer.Option(help="Number of measured requests")] = 500,
+    num_warmup: Annotated[int, typer.Option(help="Warmup iterations")] = 10,
+    num_runs: Annotated[int, typer.Option(help="Measurement iterations")] = 500,
     batch_size: Annotated[
-        int, typer.Option(help="Concurrent requests per iteration")
+        int, typer.Option(help="Batch size for performance tests")
     ] = 8,
     prompt: Annotated[
-        str, typer.Option(help="Prompt used for latency tests")
+        str, typer.Option(help="Prompt to use for performance and energy tests")
     ] = "Explain one interesting fact about large language models.",
     max_new_tokens: Annotated[
-        int, typer.Option(help="Max tokens to generate per request")
+        int, typer.Option(help="Max new tokens to generate")
     ] = 256,
     gpu_memory_utilization: Annotated[
-        float, typer.Option(help="vLLM GPU memory utilization fraction")
+        float, typer.Option(help="GPU memory utilization fraction")
     ] = 0.9,
     max_model_len: Annotated[
-        int, typer.Option(help="vLLM max model length (context window)")
-    ] = 2048,
+        int, typer.Option(help="Maximum model context length")
+    ] = 8192,
     tasks: Annotated[
         str,
         typer.Option(
-            help="Space-separated benchmark tasks. Options: performance (latency & memory), energy (power consumption), accuracy (model quality)"
+            help="Space-separated tasks to run: performance energy accuracy (or any combination)"
         ),
     ] = "performance accuracy energy",
     energy_sample_runs: Annotated[
-        int, typer.Option(help="Number of energy-tracked requests")
+        int, typer.Option(help="Number of energy sample runs")
     ] = 200,
     accuracy_tasks: Annotated[
-        str, typer.Option(help="Space-separated lm-eval tasks to run")
+        str,
+        typer.Option(
+            help="Space-separated accuracy tasks: mmlu gsm8k hellaswag (or any combination)"
+        ),
     ] = "mmlu gsm8k hellaswag",
     num_fewshot: Annotated[
-        int, typer.Option(help="Few-shot examples for accuracy tasks")
+        int, typer.Option(help="Number of few-shot examples for accuracy tests")
     ] = 5,
     accuracy_limit: Annotated[
         Optional[int], typer.Option(help="Limit examples per task for quick runs")
@@ -127,7 +128,7 @@ def run(
         int, typer.Option(help="Select NVIDIA GPU index to use (0-based)")
     ] = 0,
 ):
-    """Run complete benchmarks across models and precisions."""
+    """Run complete benchmarks for models with specified precision."""
     # Convert space-separated strings to lists
     models_list = models.split()
     tasks_list = tasks.split()
@@ -184,7 +185,7 @@ def analyze(
     """Analyze and visualize previously saved results."""
     args = _build_args(
         models=[],
-        precisions=[],
+        precision="fp16",
         output_dir=output_dir,
         quantized_models_dir="quantized-models",
         num_warmup=0,

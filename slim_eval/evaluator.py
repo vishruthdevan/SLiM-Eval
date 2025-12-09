@@ -50,7 +50,7 @@ class SLiMEvaluator:
         logger.info("SLiM-Eval initialized")
         logger.info(f"Output directory: {self.output_dir}")
         logger.info(f"Models: {args.models}")
-        logger.info(f"Precisions: {args.precisions}")
+        logger.info(f"Precision: {args.precision}")
 
         if torch.cuda.is_available():
             # Select GPU
