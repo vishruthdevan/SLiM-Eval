@@ -209,3 +209,7 @@ __marimo__/
 # local model files
 llama3.2-3B-local/
 .DS_Store
+
+# <changes: KAR>
+*.log
+quantized-models/
