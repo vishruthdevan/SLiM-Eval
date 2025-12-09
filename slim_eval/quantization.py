@@ -199,14 +199,36 @@ class QuantizationManager:
             model.save_pretrained(output_dir, save_compressed=True)
             tokenizer.save_pretrained(output_dir)
 
-            # Verify the save was successful
-            if (output_dir / "config.json").exists():
-                logger.info(f"Quantization complete: {output_dir}")
-            else:
-                logger.error(
-                    f"Quantization save failed: config.json not found in {output_dir}"
+            # Verify the save was successful - check for essential files
+            required_files = ["config.json"]
+            tokenizer_files = [
+                "tokenizer.json",
+                "tokenizer.model",
+                "tokenizer_config.json",
+            ]
+
+            missing_files = []
+            for req_file in required_files:
+                if not (output_dir / req_file).exists():
+                    missing_files.append(req_file)
+
+            # Check for at least one tokenizer file
+            has_tokenizer = any((output_dir / tf).exists() for tf in tokenizer_files)
+            if not has_tokenizer:
+                missing_files.append(
+                    "tokenizer files (tokenizer.json, tokenizer.model, or tokenizer_config.json)"
                 )
-                raise RuntimeError("Model save verification failed")
+
+            if missing_files:
+                logger.error(
+                    f"Quantization save incomplete. Missing: {', '.join(missing_files)}"
+                )
+                raise RuntimeError(
+                    f"Model save verification failed: missing {', '.join(missing_files)}"
+                )
+
+            logger.info(f"Quantization complete: {output_dir}")
+            logger.info("Verified: config.json and tokenizer files present")
 
             # Thorough cleanup to free GPU memory
             logger.info("Cleaning up GPU memory...")
@@ -220,9 +242,26 @@ class QuantizationManager:
             logger.info("GPU memory cleanup complete")
         except Exception as e:
             logger.error(f"Quantization failed: {e}", exc_info=True)
-            # Clean up incomplete output directory
-            if output_dir.exists() and not (output_dir / "config.json").exists():
-                logger.info(f"Cleaning up incomplete quantization output: {output_dir}")
-                import shutil
+            # Clean up incomplete output directory if it exists but is incomplete
+            if output_dir.exists():
+                # Check if it's a valid save
+                has_config = (output_dir / "config.json").exists()
+                tokenizer_files = [
+                    "tokenizer.json",
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                ]
+                has_tokenizer = any(
+                    (output_dir / tf).exists() for tf in tokenizer_files
+                )
 
-                shutil.rmtree(output_dir, ignore_errors=True)
+                if not (has_config and has_tokenizer):
+                    logger.info(
+                        f"Cleaning up incomplete quantization output: {output_dir}"
+                    )
+                    import shutil
+
+                    shutil.rmtree(output_dir, ignore_errors=True)
+
+            # Re-raise the exception so caller knows quantization failed
+            raise
