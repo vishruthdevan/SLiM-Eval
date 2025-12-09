@@ -1,12 +1,12 @@
 """Main SLiM-Eval orchestrator - refactored modular version."""
 
+import json
 import logging
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
-import pandas as pd
 import torch
 from vllm import LLM
 
@@ -35,8 +35,6 @@ class SLiMEvaluator:
 
         self.quantized_models_dir = Path(args.quantized_models_dir)
         self.quantized_models_dir.mkdir(exist_ok=True)
-
-        self.results_csv = self.output_dir / "complete_results.csv"
 
         # Setup file logging
         log_file = (
@@ -77,9 +75,7 @@ class SLiMEvaluator:
         self.performance_benchmark = PerformanceBenchmark(args)
         self.energy_benchmark = EnergyBenchmark(args)
         self.accuracy_benchmark = AccuracyBenchmark(args, self.quantized_models_dir)
-        self.analyzer = ResultsAnalyzer(
-            self.output_dir, self.results_csv, args.accuracy_tasks
-        )
+        self.analyzer = ResultsAnalyzer(self.output_dir, args.accuracy_tasks)
 
     def setup_vllm_model(
         self, model_name: str, precision: str, use_quantized_dir: bool = True
@@ -265,10 +261,14 @@ class SLiMEvaluator:
                 results.update(
                     self.performance_benchmark.run(llm, model_name, precision)
                 )
+                # Save performance results immediately
+                self.save_results_to_json(model_name, precision, results)
 
             # Run energy benchmark
             if self.args.enable_energy_tracking:
                 results.update(self.energy_benchmark.run(llm, model_name, precision))
+                # Save energy results immediately
+                self.save_results_to_json(model_name, precision, results)
 
             # Clean up vLLM instance before accuracy testing
             del llm
@@ -278,6 +278,8 @@ class SLiMEvaluator:
             # Run accuracy benchmark (creates its own vLLM instance)
             if self.args.enable_accuracy_tracking:
                 results.update(self.accuracy_benchmark.run(None, model_name, precision))
+                # Save accuracy results immediately
+                self.save_results_to_json(model_name, precision, results)
             else:
                 results.update(
                     {
@@ -293,16 +295,32 @@ class SLiMEvaluator:
         finally:
             clear_cache()
 
-    def initialize_results_csv(self):
-        """Initialize the results CSV file with appropriate columns."""
-        base_columns = [
-            "model",
-            "precision",
-            "quantization_scheme",
-            "timestamp",
-            "num_parameters",
-            "num_parameters_b",
-            "size_gb_fp16",
+    def save_results_to_json(self, model_name: str, precision: str, results: Dict):
+        """Save benchmark results as separate JSON files in model-specific directory.
+
+        Args:
+            model_name: HuggingFace model name or local path.
+            precision: Precision mode.
+            results: Dictionary of results.
+        """
+        # Create model_precision directory
+        model_short_name = model_name.split("/")[-1]
+        model_dir = self.output_dir / f"{model_short_name}_{precision}"
+        model_dir.mkdir(exist_ok=True)
+
+        # Common metadata for all files
+        metadata = {
+            "model": model_name,
+            "precision": precision,
+            "quantization_scheme": results.get("quantization_scheme"),
+            "timestamp": results.get("timestamp"),
+            "num_parameters": results.get("num_parameters"),
+            "num_parameters_b": results.get("num_parameters_b"),
+            "size_gb_fp16": results.get("size_gb_fp16"),
+        }
+
+        # Save performance.json (only if performance data exists)
+        performance_keys = [
             "mean_latency_s",
             "median_latency_s",
             "p95_latency_s",
@@ -312,8 +330,21 @@ class SLiMEvaluator:
             "mean_avg_mem_mb",
             "tokens_per_second",
         ]
+        has_performance_data = any(key in results for key in performance_keys)
 
-        energy_columns = [
+        if has_performance_data:
+            performance_data = metadata.copy()
+            for key in performance_keys:
+                if key in results:
+                    performance_data[key] = results[key]
+
+            performance_file = model_dir / "performance.json"
+            with open(performance_file, "w") as f:
+                json.dump(performance_data, f, indent=2)
+            logger.info(f"Saved performance results: {performance_file}")
+
+        # Save energy.json (only if energy data exists)
+        energy_keys = [
             "energy_kwh",
             "energy_joules",
             "duration_seconds",
@@ -323,15 +354,31 @@ class SLiMEvaluator:
             "std_power_watts",
             "energy_per_query_j",
         ]
+        has_energy_data = any(key in results for key in energy_keys)
 
-        accuracy_columns = [f"{task}_accuracy" for task in self.args.accuracy_tasks]
-        all_columns = base_columns + energy_columns + accuracy_columns
+        if has_energy_data:
+            energy_data = metadata.copy()
+            for key in energy_keys:
+                if key in results:
+                    energy_data[key] = results[key]
 
-        if not self.results_csv.exists():
-            pd.DataFrame(columns=all_columns).to_csv(self.results_csv, index=False)
-            logger.info(f"Created results CSV: {self.results_csv}")
-        else:
-            logger.info(f"Results CSV exists: {self.results_csv}")
+            energy_file = model_dir / "energy.json"
+            with open(energy_file, "w") as f:
+                json.dump(energy_data, f, indent=2)
+            logger.info(f"Saved energy results: {energy_file}")
+
+        # Save accuracy JSON files (one per task)
+        for task in self.args.accuracy_tasks:
+            accuracy_key = f"{task}_accuracy"
+            if accuracy_key in results:
+                accuracy_data = metadata.copy()
+                accuracy_data["task"] = task
+                accuracy_data["accuracy"] = results[accuracy_key]
+
+                accuracy_file = model_dir / f"{task}.json"
+                with open(accuracy_file, "w") as f:
+                    json.dump(accuracy_data, f, indent=2)
+                logger.info(f"Saved {task} accuracy results: {accuracy_file}")
 
     def run_all_benchmarks(self):
         """Run benchmarks for all model and precision combinations."""
@@ -344,12 +391,11 @@ class SLiMEvaluator:
             f"Total configs: {len(self.args.models) * len(self.args.precisions)}"
         )
         logger.info("Metrics: Latency, Memory, Energy, Accuracy")
-        logger.info(f"Output: {self.results_csv}")
+        logger.info(f"Output directory: {self.output_dir}")
         logger.info(
             f"Estimated time: ~{len(self.args.models) * len(self.args.precisions) * 30} minutes"
         )
 
-        self.initialize_results_csv()
         all_results = []
 
         for model_name in self.args.models:
@@ -358,14 +404,7 @@ class SLiMEvaluator:
                 results = self.run_complete_benchmark(model_name, precision)
                 if results:
                     all_results.append(results)
-                    existing_df = pd.read_csv(self.results_csv)
-                    columns = existing_df.columns.tolist()
-                    # Build from dict then align to existing CSV columns to avoid all-NaN rows
-                    results_df = pd.DataFrame([results]).reindex(columns=columns)
-                    results_df.to_csv(
-                        self.results_csv, mode="a", header=False, index=False
-                    )
-                    logger.info(f"Results saved for {config_id}")
+                    logger.info(f"All benchmarks completed for {config_id}")
                 clear_cache()
                 time.sleep(5)
 
