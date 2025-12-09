@@ -145,7 +145,11 @@ class SLiMEvaluator:
                     clear_cache()
                     time.sleep(2)  # Give time for memory to be fully released
 
-                    if quantized_path.exists():
+                    # Check if quantization actually succeeded by verifying config.json exists
+                    if (
+                        quantized_path.exists()
+                        and (quantized_path / "config.json").exists()
+                    ):
                         model_path = str(quantized_path)
                         dtype = "auto"
                         quantization = None
