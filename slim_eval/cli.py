@@ -23,7 +23,6 @@ class Precision(str, Enum):
     fp16 = "fp16"
     int8 = "int8"
     int4 = "int4"
-    gptq = "gptq"
 
 
 class Task(str, Enum):
@@ -53,7 +52,7 @@ def run(
     precision: Annotated[
         Precision,
         typer.Option(
-            help="Precision mode: fp16 (baseline), int8 (SmoothQuant+GPTQ W8A8), int4 (SmoothQuant+GPTQ W4A16), gptq (W4A16 GPTQ-only)"
+            help="Precision mode: fp16 (baseline), int8 (GPTQ W8A8), int4 (GPTQ W4A16)"
         ),
     ] = Precision.fp16,
     output_dir: Annotated[

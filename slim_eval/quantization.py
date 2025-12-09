@@ -9,7 +9,6 @@ import torch
 from datasets import load_dataset
 from llmcompressor import oneshot
 from llmcompressor.modifiers.quantization import GPTQModifier
-from llmcompressor.modifiers.smoothquant import SmoothQuantModifier
 from llmcompressor.utils import dispatch_for_generation
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -32,47 +31,49 @@ class QuantizationManager:
             args: Arguments object containing quantization settings.
         """
         self.args = args
+        # Base configs without SmoothQuant (which has architecture-specific issues)
         self.quantization_configs = {
             "int8": {
-                "recipe": [
-                    SmoothQuantModifier(smoothing_strength=0.5),
-                    GPTQModifier(
-                        targets="Linear",
-                        scheme="W8A8",
-                        ignore=["lm_head", "embed_tokens", "norm", "rotary_emb"],
-                    ),
-                ],
-                "method": "gptq_smoothquant",
-                "scheme_name": "SmoothQuant+GPTQ (W8A8)",
+                "recipe": GPTQModifier(
+                    targets="Linear",
+                    scheme="W8A8",
+                    ignore=["lm_head", "embed_tokens", "norm", "rotary_emb"],
+                ),
+                "method": "gptq_w8a8",
+                "scheme_name": "GPTQ (W8A8)",
             },
             "int4": {
-                "recipe": [
-                    SmoothQuantModifier(smoothing_strength=0.5),
-                    GPTQModifier(
-                        targets="Linear",
-                        scheme="W4A16",
-                        ignore=["lm_head", "embed_tokens", "norm", "rotary_emb"],
-                    ),
-                ],
-                "method": "gptq_smoothquant",
-                "scheme_name": "SmoothQuant+GPTQ (W4A16)",
-            },
-            "gptq": {
                 "recipe": GPTQModifier(
                     targets="Linear",
                     scheme="W4A16",
                     ignore=["lm_head", "embed_tokens", "norm", "rotary_emb"],
                 ),
-                "method": "gptq_only",
+                "method": "gptq_w4a16",
                 "scheme_name": "GPTQ (W4A16)",
             },
         }
+
+    def _get_model_architecture(self, model) -> str:
+        """Detect model architecture type.
+
+        Args:
+            model: The model to inspect.
+
+        Returns:
+            Architecture type string (e.g., 'llama', 'phi3', 'gpt2').
+        """
+        model_type = (
+            model.config.model_type.lower()
+            if hasattr(model.config, "model_type")
+            else ""
+        )
+        return model_type
 
     def get_quantization_config(self, precision: str) -> Dict:
         """Get quantization configuration for a precision mode.
 
         Args:
-            precision: Precision mode (int8, int4, gptq).
+            precision: Precision mode (int8, int4).
 
         Returns:
             Quantization configuration dictionary.
@@ -84,7 +85,7 @@ class QuantizationManager:
 
         Args:
             model_name: HuggingFace model name or local path.
-            precision: Target precision (int8, int4, gptq).
+            precision: Target precision (int8, int4).
             output_dir: Directory to save the quantized model.
         """
         logger.info("=" * 60)
@@ -149,7 +150,11 @@ class QuantizationManager:
 
             quant_config = self.quantization_configs[precision]
             recipe = quant_config["recipe"]
-            logger.info(f"Applying quantization recipe: {quant_config['method']}")
+            model_arch = self._get_model_architecture(model)
+            logger.info(f"Detected model architecture: {model_arch}")
+            logger.info(
+                f"Applying quantization recipe: {quant_config['method']} ({quant_config['scheme_name']})"
+            )
 
             oneshot(
                 model=model,

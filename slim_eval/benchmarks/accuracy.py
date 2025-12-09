@@ -100,7 +100,6 @@ class AccuracyBenchmark(BaseBenchmark):
                 if not quantized_path.exists() and precision in [
                     "int8",
                     "int4",
-                    "gptq",
                 ]:
                     model_args += f",quantization={precision}"
 

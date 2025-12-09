@@ -84,7 +84,7 @@ class SLiMEvaluator:
 
         Args:
             model_name: HuggingFace model name or local path.
-            precision: Precision mode (fp16, int8, int4, gptq).
+            precision: Precision mode (fp16, int8, int4).
             use_quantized_dir: Whether to use pre-quantized models from disk.
 
         Returns:
