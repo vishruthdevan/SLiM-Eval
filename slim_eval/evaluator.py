@@ -381,32 +381,29 @@ class SLiMEvaluator:
                 logger.info(f"Saved {task} accuracy results: {accuracy_file}")
 
     def run_all_benchmarks(self):
-        """Run benchmarks for all model and precision combinations."""
+        """Run benchmarks for all models with the specified precision."""
+        precision = self.args.precision  # Single precision now
+
         logger.info("#" * 70)
         logger.info("SLiM-Eval: COMPLETE BENCHMARK SUITE")
         logger.info("#" * 70)
         logger.info(f"Models: {len(self.args.models)}")
-        logger.info(f"Precisions: {self.args.precisions}")
-        logger.info(
-            f"Total configs: {len(self.args.models) * len(self.args.precisions)}"
-        )
+        logger.info(f"Precision: {precision}")
+        logger.info(f"Total configs: {len(self.args.models)}")
         logger.info("Metrics: Latency, Memory, Energy, Accuracy")
         logger.info(f"Output directory: {self.output_dir}")
-        logger.info(
-            f"Estimated time: ~{len(self.args.models) * len(self.args.precisions) * 30} minutes"
-        )
+        logger.info(f"Estimated time: ~{len(self.args.models) * 30} minutes")
 
         all_results = []
 
         for model_name in self.args.models:
-            for precision in self.args.precisions:
-                config_id = f"{model_name.split('/')[-1]}_{precision}"
-                results = self.run_complete_benchmark(model_name, precision)
-                if results:
-                    all_results.append(results)
-                    logger.info(f"All benchmarks completed for {config_id}")
-                clear_cache()
-                time.sleep(5)
+            config_id = f"{model_name.split('/')[-1]}_{precision}"
+            results = self.run_complete_benchmark(model_name, precision)
+            if results:
+                all_results.append(results)
+                logger.info(f"All benchmarks completed for {config_id}")
+            clear_cache()
+            time.sleep(5)
 
         logger.info("#" * 70)
         logger.info("ALL BENCHMARKS COMPLETE!")
