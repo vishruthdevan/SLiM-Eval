@@ -1,0 +1,17 @@
+{
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "precision": "int4",
+  "quantization_scheme": "SmoothQuant+GPTQ (W4A16)",
+  "timestamp": "2025-12-09T01:38:57.741005",
+  "num_parameters": 3958898688,
+  "num_parameters_b": 3.958898688,
+  "size_gb_fp16": 7.3740234375,
+  "energy_kwh": 0.010691716169390408,
+  "energy_joules": 38490.17820980547,
+  "duration_seconds": 191.77227592468262,
+  "avg_power_watts": 200.7077301670146,
+  "min_power_watts": 139.164,
+  "max_power_watts": 206.409,
+  "std_power_watts": 2.9955444294411535,
+  "energy_per_query_j": 192.45089104902735
+}

@@ -1,0 +1,17 @@
+{
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-08T23:07:57.326858",
+  "num_parameters": 3958898688,
+  "num_parameters_b": 3.958898688,
+  "size_gb_fp16": 7.3740234375,
+  "energy_kwh": 0.020986576475674756,
+  "energy_joules": 75551.67531242913,
+  "duration_seconds": 310.84287095069885,
+  "avg_power_watts": 243.05423213135867,
+  "min_power_watts": 109.691,
+  "max_power_watts": 250.131,
+  "std_power_watts": 4.498625591843965,
+  "energy_per_query_j": 377.75837656214566
+}

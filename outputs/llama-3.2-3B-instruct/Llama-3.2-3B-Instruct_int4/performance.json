@@ -1,0 +1,17 @@
+{
+  "model": "meta-llama/Llama-3.2-3B-Instruct",
+  "precision": "int4",
+  "quantization_scheme": "SmoothQuant+GPTQ (W4A16)",
+  "timestamp": "2025-12-09T01:38:57.741005",
+  "num_parameters": 3958898688,
+  "num_parameters_b": 3.958898688,
+  "size_gb_fp16": 7.3740234375,
+  "mean_latency_s": 0.13222239935398103,
+  "median_latency_s": 0.13177010416984558,
+  "p95_latency_s": 0.13253235816955566,
+  "p99_latency_s": 0.17419429620107016,
+  "std_latency_s": 0.004652142922184765,
+  "mean_peak_mem_mb": 75448.625,
+  "mean_avg_mem_mb": 75448.625,
+  "tokens_per_second": 1936.1318600386767
+}
