@@ -74,7 +74,9 @@ class SLiMEvaluator:
         self.quantization_manager = QuantizationManager(args)
         self.performance_benchmark = PerformanceBenchmark(args)
         self.energy_benchmark = EnergyBenchmark(args)
-        self.accuracy_benchmark = AccuracyBenchmark(args, self.quantized_models_dir)
+        self.accuracy_benchmark = AccuracyBenchmark(
+            args, self.quantized_models_dir, self.output_dir
+        )
         self.analyzer = ResultsAnalyzer(self.output_dir, args.accuracy_tasks)
 
     def setup_vllm_model(
@@ -280,8 +282,22 @@ class SLiMEvaluator:
 
             # Run accuracy benchmark (creates its own vLLM instance)
             if self.args.enable_accuracy_tracking:
-                results.update(self.accuracy_benchmark.run(None, model_name, precision))
-                # Save accuracy results immediately
+                # Prepare metadata for individual task saves
+                task_metadata = {
+                    "model": model_name,
+                    "precision": precision,
+                    "quantization_scheme": results.get("quantization_scheme"),
+                    "timestamp": results.get("timestamp"),
+                    "num_parameters": results.get("num_parameters"),
+                    "num_parameters_b": results.get("num_parameters_b"),
+                    "size_gb_fp16": results.get("size_gb_fp16"),
+                }
+                results.update(
+                    self.accuracy_benchmark.run(
+                        None, model_name, precision, task_metadata
+                    )
+                )
+                # Save accuracy results immediately (this will now be redundant as tasks save individually)
                 self.save_results_to_json(model_name, precision, results)
             else:
                 results.update(
