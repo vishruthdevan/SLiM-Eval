@@ -1,5 +1,6 @@
 """Accuracy benchmarking for SLiM-Eval."""
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict
@@ -15,21 +16,61 @@ logger = logging.getLogger(__name__)
 class AccuracyBenchmark(BaseBenchmark):
     """Benchmark for measuring model accuracy on various tasks."""
 
-    def __init__(self, args, quantized_models_dir: Path):
+    def __init__(self, args, quantized_models_dir: Path, output_dir: Path = None):
         """Initialize accuracy benchmark.
 
         Args:
             args: Arguments object containing benchmark settings.
             quantized_models_dir: Directory where quantized models are stored.
+            output_dir: Directory where results should be saved (optional).
         """
         super().__init__(args)
         self.quantized_models_dir = quantized_models_dir
+        self.output_dir = output_dir
 
     def get_result_keys(self) -> list:
         """Get the list of result keys this benchmark produces."""
         return [f"{task}_accuracy" for task in self.args.accuracy_tasks]
 
-    def run(self, llm, model_name: str, precision: str) -> Dict[str, Any]:
+    def save_task_result(
+        self,
+        task_name: str,
+        accuracy: float,
+        model_name: str,
+        precision: str,
+        metadata: Dict[str, Any],
+    ):
+        """Save individual task result to JSON file immediately.
+
+        Args:
+            task_name: Name of the accuracy task.
+            accuracy: Accuracy score for the task.
+            model_name: Name or path of the model.
+            precision: Precision mode being evaluated.
+            metadata: Additional metadata to include in the JSON file.
+        """
+        if self.output_dir is None:
+            return
+
+        # Create model_precision directory
+        model_short_name = model_name.split("/")[-1]
+        model_dir = self.output_dir / f"{model_short_name}_{precision}"
+        model_dir.mkdir(exist_ok=True)
+
+        # Prepare task result data
+        task_data = metadata.copy()
+        task_data["task"] = task_name
+        task_data["accuracy"] = accuracy
+
+        # Save to JSON file
+        task_file = model_dir / f"{task_name}.json"
+        with open(task_file, "w") as f:
+            json.dump(task_data, f, indent=2)
+        logger.info(f"Saved {task_name} accuracy result: {task_file}")
+
+    def run(
+        self, llm, model_name: str, precision: str, metadata: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """Run accuracy benchmark.
 
         Note: This benchmark doesn't use the llm parameter as it creates its own
@@ -136,46 +177,41 @@ class AccuracyBenchmark(BaseBenchmark):
                     logger.info(f"Task '{task_name}' values: {task_res}")
 
                     metric_found = False
+                    task_accuracy = 0.0
 
                     if "exact_match,flexible-extract" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res[
-                            "exact_match,flexible-extract"
-                        ]
+                        task_accuracy = task_res["exact_match,flexible-extract"]
                         logger.info(
-                            f"Using 'exact_match,flexible-extract': {task_res['exact_match,flexible-extract']}"
+                            f"Using 'exact_match,flexible-extract': {task_accuracy}"
                         )
                         metric_found = True
                     elif "exact_match,strict-match" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res[
-                            "exact_match,strict-match"
-                        ]
+                        task_accuracy = task_res["exact_match,strict-match"]
                         logger.info(
-                            f"Using 'exact_match,strict-match': {task_res['exact_match,strict-match']}"
+                            f"Using 'exact_match,strict-match': {task_accuracy}"
                         )
                         metric_found = True
                     elif "exact_match" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res[
-                            "exact_match"
-                        ]
-                        logger.info(f"Using 'exact_match': {task_res['exact_match']}")
+                        task_accuracy = task_res["exact_match"]
+                        logger.info(f"Using 'exact_match': {task_accuracy}")
                         metric_found = True
                     elif "acc_norm" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc_norm"]
-                        logger.info(f"Using 'acc_norm': {task_res['acc_norm']}")
+                        task_accuracy = task_res["acc_norm"]
+                        logger.info(f"Using 'acc_norm': {task_accuracy}")
                         metric_found = True
                     elif "acc" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res["acc"]
-                        logger.info(f"Using 'acc': {task_res['acc']}")
+                        task_accuracy = task_res["acc"]
+                        logger.info(f"Using 'acc': {task_accuracy}")
                         metric_found = True
                     elif "pass@1" in task_res:
-                        accuracy_results[f"{task_name}_accuracy"] = task_res["pass@1"]
-                        logger.info(f"Using 'pass@1': {task_res['pass@1']}")
+                        task_accuracy = task_res["pass@1"]
+                        logger.info(f"Using 'pass@1': {task_accuracy}")
                         metric_found = True
 
                     if not metric_found:
                         for key, value in task_res.items():
                             if isinstance(value, (int, float)) and 0 <= value <= 1:
-                                accuracy_results[f"{task_name}_accuracy"] = value
+                                task_accuracy = value
                                 logger.info(f"Using fallback metric '{key}': {value}")
                                 metric_found = True
                                 break
@@ -184,7 +220,16 @@ class AccuracyBenchmark(BaseBenchmark):
                         logger.warning(
                             f"No valid metric found for '{task_name}'. Setting accuracy to 0."
                         )
-                        accuracy_results[f"{task_name}_accuracy"] = 0.0
+                        task_accuracy = 0.0
+
+                    # Store result
+                    accuracy_results[f"{task_name}_accuracy"] = task_accuracy
+
+                    # Save task result immediately after completion
+                    if metadata:
+                        self.save_task_result(
+                            task_name, task_accuracy, model_name, precision, metadata
+                        )
 
             logger.info("Accuracy results:")
             for task, acc in accuracy_results.items():
