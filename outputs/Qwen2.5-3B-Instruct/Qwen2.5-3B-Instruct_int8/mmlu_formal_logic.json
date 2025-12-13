@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "precision": "int8",
+  "quantization_scheme": "GPTQ (W8A8)",
+  "timestamp": "2025-12-10T18:16:38.432483",
+  "num_parameters": 2434269184,
+  "num_parameters_b": 2.434269184,
+  "size_gb_fp16": 4.5341796875,
+  "task": "mmlu_formal_logic",
+  "accuracy": 0.4603174603174603
+}

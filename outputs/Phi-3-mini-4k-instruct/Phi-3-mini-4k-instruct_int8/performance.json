@@ -1,0 +1,17 @@
+{
+  "model": "microsoft/Phi-3-mini-4k-instruct",
+  "precision": "int8",
+  "quantization_scheme": "GPTQ (W8A8)",
+  "timestamp": "2025-12-09T22:48:22.877711",
+  "num_parameters": 3820879872,
+  "num_parameters_b": 3.820879872,
+  "size_gb_fp16": 7.116943359375,
+  "mean_latency_s": 0.17964096713066102,
+  "median_latency_s": 0.17950889468193054,
+  "p95_latency_s": 0.1800573468208313,
+  "p99_latency_s": 0.22774950663248697,
+  "std_latency_s": 0.005368450713587066,
+  "mean_peak_mem_mb": 75166.625,
+  "mean_avg_mem_mb": 75170.625,
+  "tokens_per_second": 1425.0646948131803
+}

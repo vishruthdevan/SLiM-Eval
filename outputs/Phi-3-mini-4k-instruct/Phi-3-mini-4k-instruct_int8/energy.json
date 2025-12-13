@@ -1,0 +1,17 @@
+{
+  "model": "microsoft/Phi-3-mini-4k-instruct",
+  "precision": "int8",
+  "quantization_scheme": "GPTQ (W8A8)",
+  "timestamp": "2025-12-09T22:48:22.877711",
+  "num_parameters": 3820879872,
+  "num_parameters_b": 3.820879872,
+  "size_gb_fp16": 7.116943359375,
+  "energy_kwh": 0.011632087666715104,
+  "energy_joules": 41875.515600174374,
+  "duration_seconds": 202.33572268486023,
+  "avg_power_watts": 206.96056556160318,
+  "min_power_watts": 79.05,
+  "max_power_watts": 216.361,
+  "std_power_watts": 4.9702036094239315,
+  "energy_per_query_j": 209.37757800087186
+}

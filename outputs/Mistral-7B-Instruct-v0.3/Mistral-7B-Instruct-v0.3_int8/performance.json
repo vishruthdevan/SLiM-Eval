@@ -1,0 +1,17 @@
+{
+  "model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "precision": "int8",
+  "quantization_scheme": "GPTQ (W8A8)",
+  "timestamp": "2025-12-12T16:51:16.122730",
+  "num_parameters": 6710886400,
+  "num_parameters_b": 6.7108864,
+  "size_gb_fp16": 12.5,
+  "mean_latency_s": 0.12636678862571715,
+  "median_latency_s": 0.12588375806808472,
+  "p95_latency_s": 0.1261836290359497,
+  "p99_latency_s": 0.16652592023213705,
+  "std_latency_s": 0.004428244866059079,
+  "mean_peak_mem_mb": 74882.625,
+  "mean_avg_mem_mb": 74884.625,
+  "tokens_per_second": 989.183956951178
+}

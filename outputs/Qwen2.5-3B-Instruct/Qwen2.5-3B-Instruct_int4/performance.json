@@ -1,0 +1,17 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "precision": "int4",
+  "quantization_scheme": "GPTQ (W4A16)",
+  "timestamp": "2025-12-10T21:34:03.399061",
+  "num_parameters": 2434269184,
+  "num_parameters_b": 2.434269184,
+  "size_gb_fp16": 4.5341796875,
+  "mean_latency_s": 0.15272376930713655,
+  "median_latency_s": 0.15236014127731323,
+  "p95_latency_s": 0.15292561054229736,
+  "p99_latency_s": 0.20210846265157065,
+  "std_latency_s": 0.0054792127460019735,
+  "mean_peak_mem_mb": 75618.625,
+  "mean_avg_mem_mb": 75618.625,
+  "tokens_per_second": 1583.0410753796302
+}

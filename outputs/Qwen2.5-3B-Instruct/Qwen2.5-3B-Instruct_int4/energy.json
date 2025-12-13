@@ -1,0 +1,17 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "precision": "int4",
+  "quantization_scheme": "GPTQ (W4A16)",
+  "timestamp": "2025-12-10T21:34:03.399061",
+  "num_parameters": 2434269184,
+  "num_parameters_b": 2.434269184,
+  "size_gb_fp16": 4.5341796875,
+  "energy_kwh": 0.011312809393697928,
+  "energy_joules": 40726.113817312544,
+  "duration_seconds": 240.56627798080444,
+  "avg_power_watts": 169.29269621306696,
+  "min_power_watts": 76.241,
+  "max_power_watts": 174.24,
+  "std_power_watts": 3.44976803590539,
+  "energy_per_query_j": 203.63056908656273
+}
