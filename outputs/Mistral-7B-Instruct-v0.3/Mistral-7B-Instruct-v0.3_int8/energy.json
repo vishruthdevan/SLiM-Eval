@@ -1,0 +1,17 @@
+{
+  "model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "precision": "int8",
+  "quantization_scheme": "GPTQ (W8A8)",
+  "timestamp": "2025-12-12T16:51:16.122730",
+  "num_parameters": 6710886400,
+  "num_parameters_b": 6.7108864,
+  "size_gb_fp16": 12.5,
+  "energy_kwh": 0.021088844146873623,
+  "energy_joules": 75919.83892874504,
+  "duration_seconds": 329.61797523498535,
+  "avg_power_watts": 230.3267559198543,
+  "min_power_watts": 78.886,
+  "max_power_watts": 236.42,
+  "std_power_watts": 4.724756985355087,
+  "energy_per_query_j": 379.5991946437252
+}
