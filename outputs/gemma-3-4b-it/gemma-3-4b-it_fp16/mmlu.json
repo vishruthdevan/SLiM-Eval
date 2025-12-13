@@ -1,0 +1,11 @@
+{
+  "model": "google/gemma-3-4b-it",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-09T15:51:19.013097",
+  "num_parameters": 0,
+  "num_parameters_b": 0.0,
+  "size_gb_fp16": 0.0,
+  "task": "mmlu",
+  "accuracy": 0.5834638940321891
+}

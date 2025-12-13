@@ -1,0 +1,17 @@
+{
+  "model": "google/gemma-3-4b-it",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-09T15:51:19.013097",
+  "num_parameters": 0,
+  "num_parameters_b": 0.0,
+  "size_gb_fp16": 0.0,
+  "energy_kwh": 0.02667554833144747,
+  "energy_joules": 96031.9739932109,
+  "duration_seconds": 401.11759519577026,
+  "avg_power_watts": 239.41102345894683,
+  "min_power_watts": 80.572,
+  "max_power_watts": 254.128,
+  "std_power_watts": 5.66723143194876,
+  "energy_per_query_j": 480.1598699660545
+}
