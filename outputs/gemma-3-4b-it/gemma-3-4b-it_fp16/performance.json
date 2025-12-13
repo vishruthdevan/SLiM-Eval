@@ -1,0 +1,17 @@
+{
+  "model": "google/gemma-3-4b-it",
+  "precision": "fp16",
+  "quantization_scheme": "FP16",
+  "timestamp": "2025-12-09T15:51:19.013097",
+  "num_parameters": 0,
+  "num_parameters_b": 0.0,
+  "size_gb_fp16": 0.0,
+  "mean_latency_s": 0.2597755591869354,
+  "median_latency_s": 0.2600066661834717,
+  "p95_latency_s": 0.2616434693336487,
+  "p99_latency_s": 0.28931403160095215,
+  "std_latency_s": 0.006166607160500928,
+  "mean_peak_mem_mb": 74380.625,
+  "mean_avg_mem_mb": 74382.625,
+  "tokens_per_second": 966.1878922927667
+}
