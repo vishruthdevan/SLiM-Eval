@@ -1,3 +1,4 @@
+import os
 import logging
 from enum import Enum
 from typing import List, Optional
@@ -126,6 +127,18 @@ def run(
     gpu_index: Annotated[
         int, typer.Option(help="Select NVIDIA GPU index to use (0-based)")
     ] = 0,
+    wandb_enabled: Annotated[
+        bool, typer.Option(help="Enable Weights & Biases logging")
+    ] = True,
+    wandb_project: Annotated[
+        str, typer.Option(help="W&B project name")
+    ] = "slim-eval",
+    wandb_api_key: Annotated[
+        str, typer.Option(help="W&B API key (or set WANDB_API_KEY env var)")
+    ] = "",
+    wandb_run_name: Annotated[
+        str, typer.Option(help="W&B run name template (leave empty for auto-generation)")
+    ] = "",
 ):
     """Run complete benchmarks for models with specified precision."""
     # Convert space-separated strings to lists
@@ -166,6 +179,11 @@ def run(
         num_calibration_samples=num_calibration_samples,
         max_sequence_length=max_sequence_length,
         gpu_index=gpu_index,
+        gpu_index=gpu_index,
+        wandb_enabled=wandb_enabled,
+        wandb_project=wandb_project,
+        wandb_api_key=wandb_api_key,
+        wandb_run_name=wandb_run_name,
     )
 
     evaluator = SLiMEvaluator(args)
