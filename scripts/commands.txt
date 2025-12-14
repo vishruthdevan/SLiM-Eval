@@ -14,9 +14,6 @@ slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int8 -—ma
 
 slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions fp16 --accuracy-batch-size-mmlu 1 --max-model-len 8192 --gpu-index 0
 
-slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int8 --tasks "enerygy performance" --max-model-len 8192 --gpu-index 6
-slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int8 --tasks "energy performance" --max-model-len 8192
-
 slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int8 --tasks "energy performance" --max-model-len 8192 --quantized-models-dir /mnt/swordfish-pool2/kavin/slimeval/quantized_models
 slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int4 --tasks "energy performance" --max-model-len 8192 --quantized-models-dir /mnt/swordfish-pool2/kavin/slimeval/quantized_models
 
@@ -30,4 +27,8 @@ slim-eval run \
 
 slim-eval run --models meta-llama/Llama-3.2-3B-Instruct --precisions int8 --tasks "energy performance" --max-model-len 8192 --quantized-models-dir /mnt/swordfish-pool2/kavin/slimeval/quantized_models --output-dir /mnt/swordfish-pool2/kavin/slimeval/outputs
 
-google/gemma-3-4b-it
+// wandb
+python -m slim_eval.cli run --wandb-project "slim-eval" --wandb-api-key "your-key-here"
+python -m slim_eval.cli run --wandb-run-name "llama3-int8-experiment-1"
+python -m slim_eval.cli run --wandb-enabled False
+export WANDB_API_KEY="your-key-here"
