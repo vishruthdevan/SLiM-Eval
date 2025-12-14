@@ -179,7 +179,6 @@ def run(
         num_calibration_samples=num_calibration_samples,
         max_sequence_length=max_sequence_length,
         gpu_index=gpu_index,
-        gpu_index=gpu_index,
         wandb_enabled=wandb_enabled,
         wandb_project=wandb_project,
         wandb_api_key=wandb_api_key,
