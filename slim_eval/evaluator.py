@@ -1,5 +1,5 @@
-"""Main SLiM-Eval orchestrator - refactored modular version."""
-
+import os
+import wandb
 import json
 import logging
 import time
@@ -30,6 +30,12 @@ class SLiMEvaluator:
             args: Arguments object containing all configuration.
         """
         self.args = args
+        self.wandb_run = None
+        
+        # Initialize wandb if enabled
+        if getattr(self.args, 'wandb_enabled', False):
+            self._init_wandb()
+        
         self.output_dir = Path(args.output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
@@ -78,6 +84,158 @@ class SLiMEvaluator:
             args, self.quantized_models_dir, self.output_dir
         )
         self.analyzer = ResultsAnalyzer(self.output_dir, args.accuracy_tasks)
+    
+    def _init_wandb(self):
+        """Initialize Weights & Biases logging."""
+        try:
+            # Set API key if provided
+            if hasattr(self.args, 'wandb_api_key') and self.args.wandb_api_key:
+                os.environ["WANDB_API_KEY"] = self.args.wandb_api_key
+            
+            # Generate run name if not provided
+            if hasattr(self.args, 'wandb_run_name') and self.args.wandb_run_name:
+                run_name = self.args.wandb_run_name
+            else:
+                # Auto-generate: model_precision (e.g., "Llama-3.2-3B_int8")
+                model_name = self.args.models[0].split('/')[-1] if self.args.models else "unknown"
+                run_name = f"{model_name}_{self.args.precision}"
+            
+            # Prepare config dictionary
+            config = {
+                "models": self.args.models,
+                "precision": self.args.precision,
+                "batch_size": self.args.batch_size,
+                "max_new_tokens": self.args.max_new_tokens,
+                "num_runs": self.args.num_runs,
+                "num_warmup": self.args.num_warmup,
+                "gpu_memory_utilization": self.args.gpu_memory_utilization,
+                "max_model_len": self.args.max_model_len,
+                "enable_performance_tracking": self.args.enable_performance_tracking,
+                "enable_energy_tracking": self.args.enable_energy_tracking,
+                "enable_accuracy_tracking": self.args.enable_accuracy_tracking,
+            }
+            
+            # Add accuracy-specific config if enabled
+            if self.args.enable_accuracy_tracking:
+                config.update({
+                    "accuracy_tasks": self.args.accuracy_tasks,
+                    "num_fewshot": self.args.num_fewshot,
+                    "accuracy_batch_size": self.args.accuracy_batch_size,
+                })
+            
+            # Add quantization config if not fp16
+            if self.args.precision != "fp16":
+                config.update({
+                    "calibration_dataset": self.args.calibration_dataset,
+                    "num_calibration_samples": self.args.num_calibration_samples,
+                    "max_sequence_length": self.args.max_sequence_length,
+                })
+            
+            # Initialize wandb
+            self.wandb_run = wandb.init(
+                project=self.args.wandb_project,
+                name=run_name,
+                config=config,
+                tags=[self.args.precision, "quantization-benchmark"],
+            )
+            
+            logger.info(f"Weights & Biases initialized: {run_name}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize W&B: {e}")
+            self.wandb_run = None
+    
+    def _log_to_wandb(self, results: Dict[str, Any], model_name: str, precision: str):
+        """Log results to Weights & Biases.
+        
+        Args:
+            results: Results dictionary to log.
+            model_name: Name of the model.
+            precision: Precision mode used.
+        """
+        try:
+            # Prepare metrics for logging
+            wandb_metrics = {
+                "model": model_name,
+                "precision": precision,
+            }
+            
+            # Add model info
+            if "model_info" in results:
+                wandb_metrics.update({
+                    "num_parameters_b": results["model_info"].get("num_parameters_b", 0),
+                    "size_gb_fp16": results["model_info"].get("size_gb_fp16", 0),
+                })
+            
+            # Add performance metrics
+            if "performance" in results:
+                perf = results["performance"]
+                wandb_metrics.update({
+                    "latency/mean_s": perf.get("mean_latency_s", 0),
+                    "latency/median_s": perf.get("median_latency_s", 0),
+                    "latency/p95_s": perf.get("p95_latency_s", 0),
+                    "latency/p99_s": perf.get("p99_latency_s", 0),
+                    "memory/peak_mb": perf.get("mean_peak_mem_mb", 0),
+                    "memory/avg_mb": perf.get("mean_avg_mem_mb", 0),
+                    "memory/baseline_mb": perf.get("baseline_memory_mb", 0),
+                    "throughput/tokens_per_sec": perf.get("tokens_per_second", 0),
+                })
+            
+            # Add energy metrics
+            if "energy" in results:
+                energy = results["energy"]
+                wandb_metrics.update({
+                    "energy/kwh": energy.get("energy_kwh", 0),
+                    "energy/joules": energy.get("energy_joules", 0),
+                    "energy/avg_power_watts": energy.get("avg_power_watts", 0),
+                    "energy/per_query_j": energy.get("energy_per_query_j", 0),
+                })
+            
+            # Add accuracy metrics
+            if "accuracy" in results:
+                acc = results["accuracy"]
+                for task, value in acc.items():
+                    if task.endswith("_accuracy"):
+                        # Log as both raw and percentage
+                        task_name = task.replace("_accuracy", "")
+                        wandb_metrics[f"accuracy/{task_name}"] = value
+                        wandb_metrics[f"accuracy/{task_name}_pct"] = value * 100
+            
+            # Log all metrics
+            wandb.log(wandb_metrics)
+            
+            # Create summary metrics table
+            summary_data = []
+            if "performance" in results:
+                summary_data.append([
+                    "Performance",
+                    f"{wandb_metrics.get('latency/mean_s', 0):.4f}s",
+                    f"{wandb_metrics.get('throughput/tokens_per_sec', 0):.2f} tok/s",
+                    f"{wandb_metrics.get('memory/peak_mb', 0):.1f} MB"
+                ])
+            
+            if "accuracy" in results:
+                for task in self.args.accuracy_tasks:
+                    acc_key = f"accuracy/{task}"
+                    if acc_key in wandb_metrics:
+                        summary_data.append([
+                            f"Accuracy ({task})",
+                            f"{wandb_metrics[acc_key]:.4f}",
+                            f"{wandb_metrics[acc_key] * 100:.2f}%",
+                            "-"
+                        ])
+            
+            if summary_data:
+                summary_table = wandb.Table(
+                    columns=["Metric", "Value", "Alternative", "Notes"],
+                    data=summary_data
+                )
+                wandb.log({"results_summary": summary_table})
+            
+            logger.info(f"✓ Logged results to W&B")
+            
+        except Exception as e:
+            logger.warning(f"Failed to log to W&B: {e}")
 
     def setup_vllm_model(
         self, model_name: str, precision: str, use_quantized_dir: bool = True
@@ -398,6 +556,10 @@ class SLiMEvaluator:
                 with open(accuracy_file, "w") as f:
                     json.dump(accuracy_data, f, indent=2)
                 logger.info(f"Saved {task} accuracy results: {accuracy_file}")
+        
+        # Log to wandb
+        if self.wandb_run:
+            self._log_to_wandb(results, model_name, precision)
 
     def run_all_benchmarks(self):
         """Run benchmarks for all models with the specified precision."""
@@ -425,8 +587,13 @@ class SLiMEvaluator:
             time.sleep(5)
 
         logger.info("#" * 70)
-        logger.info("ALL BENCHMARKS COMPLETE!")
+        logger.info("All benchmarks complete!")
         logger.info("#" * 70)
+        
+        # Finish wandb run
+        if self.wandb_run:
+            wandb.finish()
+            logger.info("Weights & Biases run finished")
         return all_results
 
     def analyze_results(self):

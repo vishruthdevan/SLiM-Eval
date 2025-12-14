@@ -1,5 +1,7 @@
-"""Accuracy benchmarking for SLiM-Eval."""
-
+try:
+    import wandb
+except ImportError:
+    wandb = None
 import json
 import logging
 from pathlib import Path
@@ -230,6 +232,16 @@ class AccuracyBenchmark(BaseBenchmark):
                         self.save_task_result(
                             task_name, task_accuracy, model_name, precision, metadata
                         )
+                    
+                    # Log to wandb if available
+                    try:
+                        if wandb.run is not None:
+                            wandb.log({
+                                f"accuracy/{task_name}_progress": task_accuracy,
+                                f"accuracy/{task_name}_progress_pct": task_accuracy * 100,
+                            })
+                    except Exception:
+                        pass  # wandb not initialized, skip
 
             logger.info("Accuracy results:")
             for task, acc in accuracy_results.items():
