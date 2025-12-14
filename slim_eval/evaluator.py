@@ -149,7 +149,7 @@ class SLiMEvaluator:
         """Log results to Weights & Biases.
         
         Args:
-            results: Results dictionary to log.
+            results: Results dictionary to log (flat structure).
             model_name: Name of the model.
             precision: Precision mode used.
         """
@@ -158,81 +158,106 @@ class SLiMEvaluator:
             wandb_metrics = {
                 "model": model_name,
                 "precision": precision,
+                "quantization_scheme": results.get("quantization_scheme", "N/A"),
             }
             
-            # Add model info
-            if "model_info" in results:
-                wandb_metrics.update({
-                    "num_parameters_b": results["model_info"].get("num_parameters_b", 0),
-                    "size_gb_fp16": results["model_info"].get("size_gb_fp16", 0),
-                })
+            # Add model info (if available)
+            if "num_parameters_b" in results:
+                wandb_metrics["model/num_parameters_b"] = results["num_parameters_b"]
+            if "size_gb_fp16" in results:
+                wandb_metrics["model/size_gb_fp16"] = results["size_gb_fp16"]
+            if "num_parameters" in results:
+                wandb_metrics["model/num_parameters"] = results["num_parameters"]
             
-            # Add performance metrics
-            if "performance" in results:
-                perf = results["performance"]
-                wandb_metrics.update({
-                    "latency/mean_s": perf.get("mean_latency_s", 0),
-                    "latency/median_s": perf.get("median_latency_s", 0),
-                    "latency/p95_s": perf.get("p95_latency_s", 0),
-                    "latency/p99_s": perf.get("p99_latency_s", 0),
-                    "memory/peak_mb": perf.get("mean_peak_mem_mb", 0),
-                    "memory/avg_mb": perf.get("mean_avg_mem_mb", 0),
-                    "memory/baseline_mb": perf.get("baseline_memory_mb", 0),
-                    "throughput/tokens_per_sec": perf.get("tokens_per_second", 0),
-                })
+            # Add performance metrics (if available)
+            performance_keys = {
+                "mean_latency_s": "latency/mean_s",
+                "median_latency_s": "latency/median_s",
+                "p95_latency_s": "latency/p95_s",
+                "p99_latency_s": "latency/p99_s",
+                "std_latency_s": "latency/std_s",
+                "mean_peak_mem_mb": "memory/peak_mb",
+                "mean_avg_mem_mb": "memory/avg_mb",
+                "baseline_memory_mb": "memory/baseline_mb",
+                "tokens_per_second": "throughput/tokens_per_sec",
+            }
             
-            # Add energy metrics
-            if "energy" in results:
-                energy = results["energy"]
-                wandb_metrics.update({
-                    "energy/kwh": energy.get("energy_kwh", 0),
-                    "energy/joules": energy.get("energy_joules", 0),
-                    "energy/avg_power_watts": energy.get("avg_power_watts", 0),
-                    "energy/per_query_j": energy.get("energy_per_query_j", 0),
-                })
+            for result_key, wandb_key in performance_keys.items():
+                if result_key in results:
+                    wandb_metrics[wandb_key] = results[result_key]
             
-            # Add accuracy metrics
-            if "accuracy" in results:
-                acc = results["accuracy"]
-                for task, value in acc.items():
-                    if task.endswith("_accuracy"):
-                        # Log as both raw and percentage
-                        task_name = task.replace("_accuracy", "")
-                        wandb_metrics[f"accuracy/{task_name}"] = value
-                        wandb_metrics[f"accuracy/{task_name}_pct"] = value * 100
+            # Add energy metrics (if available)
+            energy_keys = {
+                "energy_kwh": "energy/kwh",
+                "energy_joules": "energy/joules",
+                "duration_seconds": "energy/duration_s",
+                "avg_power_watts": "energy/avg_power_watts",
+                "min_power_watts": "energy/min_power_watts",
+                "max_power_watts": "energy/max_power_watts",
+                "std_power_watts": "energy/std_power_watts",
+                "energy_per_query_j": "energy/per_query_j",
+            }
+            
+            for result_key, wandb_key in energy_keys.items():
+                if result_key in results:
+                    wandb_metrics[wandb_key] = results[result_key]
+            
+            # Add accuracy metrics (if available)
+            for task in self.args.accuracy_tasks:
+                accuracy_key = f"{task}_accuracy"
+                if accuracy_key in results:
+                    value = results[accuracy_key]
+                    wandb_metrics[f"accuracy/{task}"] = value
+                    wandb_metrics[f"accuracy/{task}_pct"] = value * 100
             
             # Log all metrics
             wandb.log(wandb_metrics)
             
-            # Create summary metrics table
+            # Create a summary table for better visualization
             summary_data = []
-            if "performance" in results:
+            
+            # Add performance row if data exists
+            if "mean_latency_s" in results:
                 summary_data.append([
-                    "Performance",
-                    f"{wandb_metrics.get('latency/mean_s', 0):.4f}s",
-                    f"{wandb_metrics.get('throughput/tokens_per_sec', 0):.2f} tok/s",
-                    f"{wandb_metrics.get('memory/peak_mb', 0):.1f} MB"
+                    "Latency (mean)",
+                    f"{results['mean_latency_s']:.4f} s",
+                    f"{results.get('tokens_per_second', 0):.2f} tok/s",
                 ])
             
-            if "accuracy" in results:
-                for task in self.args.accuracy_tasks:
-                    acc_key = f"accuracy/{task}"
-                    if acc_key in wandb_metrics:
-                        summary_data.append([
-                            f"Accuracy ({task})",
-                            f"{wandb_metrics[acc_key]:.4f}",
-                            f"{wandb_metrics[acc_key] * 100:.2f}%",
-                            "-"
-                        ])
+            if "mean_peak_mem_mb" in results:
+                summary_data.append([
+                    "Memory (peak)",
+                    f"{results['mean_peak_mem_mb']:.2f} MB",
+                    f"{results.get('baseline_memory_mb', 0):.2f} MB baseline",
+                ])
             
+            # Add energy row if data exists
+            if "energy_kwh" in results:
+                summary_data.append([
+                    "Energy",
+                    f"{results['energy_kwh'] * 1000:.4f} Wh",
+                    f"{results['avg_power_watts']:.2f} W avg",
+                ])
+            
+            # Add accuracy rows
+            for task in self.args.accuracy_tasks:
+                accuracy_key = f"{task}_accuracy"
+                if accuracy_key in results:
+                    summary_data.append([
+                        f"Accuracy ({task})",
+                        f"{results[accuracy_key]:.4f}",
+                        f"{results[accuracy_key] * 100:.2f}%",
+                    ])
+            
+            # Log summary table
             if summary_data:
                 summary_table = wandb.Table(
-                    columns=["Metric", "Value", "Alternative", "Notes"],
+                    columns=["Metric", "Value", "Additional Info"],
                     data=summary_data
                 )
                 wandb.log({"results_summary": summary_table})
             
-            logger.info(f"✓ Logged results to W&B")
+            logger.info(f"✓ Logged {len(wandb_metrics)} metrics to W&B")
             
         except Exception as e:
             logger.warning(f"Failed to log to W&B: {e}")
