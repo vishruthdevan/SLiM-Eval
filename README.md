@@ -273,7 +273,7 @@ If you use SLiM-Eval in your research, please cite:
 
 ```bibtex
 @software{slim_eval2025,
-  author = {Devan, Vishruth},
+  author = {Devan, Vishruth and Rajkumar, Kavin Aravindhan},
   title = {SLiM-Eval: Small Language Model Evaluation Framework},
   year = {2025},
   url = {https://github.com/vishruthdevan/SLiM-Eval}
@@ -294,5 +294,5 @@ Built with:
 
 ---
 
-**Maintained by**: [@vishruthdevan](https://github.com/vishruthdevan)  
+**Maintained by**: [@vishruthdevan](https://github.com/vishruthdevan) and [@KavinAravindhan](https://github.com/KavinAravindhan)
 **Issues**: [GitHub Issues](https://github.com/vishruthdevan/SLiM-Eval/issues)
