@@ -213,6 +213,7 @@ llama3.2-3B-local/
 # <changes: KAR>
 *.log
 quantized-models/
+wandb/
 
 # Helper scripts
 full_script.sh

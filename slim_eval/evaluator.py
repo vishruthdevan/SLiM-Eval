@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import torch
 from vllm import LLM
@@ -137,6 +137,7 @@ class SLiMEvaluator:
                 name=run_name,
                 config=config,
                 tags=[self.args.precision, "quantization-benchmark"],
+                group=model_name.split('/')[-1],  # groups runs by model
             )
             
             logger.info(f"Weights & Biases initialized: {run_name}")
@@ -209,9 +210,13 @@ class SLiMEvaluator:
                     value = results[accuracy_key]
                     wandb_metrics[f"accuracy/{task}"] = value
                     wandb_metrics[f"accuracy/{task}_pct"] = value * 100
-            
-            # Log all metrics
+
+            # Log all metrics as both logs (for charts) and summary (for comparison)
             wandb.log(wandb_metrics)
+            
+            # Also set as summary for better comparison view
+            for key, value in wandb_metrics.items():
+                wandb.summary[key] = value
             
             # Create a summary table for better visualization
             summary_data = []
@@ -257,7 +262,7 @@ class SLiMEvaluator:
                 )
                 wandb.log({"results_summary": summary_table})
             
-            logger.info(f"✓ Logged {len(wandb_metrics)} metrics to W&B")
+            logger.info(f"Logged {len(wandb_metrics)} metrics to W&B")
             
         except Exception as e:
             logger.warning(f"Failed to log to W&B: {e}")
