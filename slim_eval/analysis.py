@@ -18,13 +18,15 @@ logger = logging.getLogger(__name__)
 class ResultsAnalyzer:
     """Analyzes and visualizes benchmark results."""
 
-    def __init__(self, output_dir: Path, accuracy_tasks: list):
+    def __init__(self, input_dir: Path, output_dir: Path, accuracy_tasks: list):
         """Initialize results analyzer.
 
         Args:
+            input_dir: Directory containing benchmark results to analyze.
             output_dir: Directory for saving analysis outputs.
             accuracy_tasks: List of accuracy task names.
         """
+        self.input_dir = input_dir
         self.output_dir = output_dir
         self.accuracy_tasks = accuracy_tasks
 
@@ -37,7 +39,7 @@ class ResultsAnalyzer:
         all_results = []
 
         # Find all model directories (first level)
-        for model_dir in self.output_dir.iterdir():
+        for model_dir in self.input_dir.iterdir():
             if not model_dir.is_dir():
                 continue
 
@@ -192,14 +194,14 @@ class ResultsAnalyzer:
             )
         # Add model labels
         for _, row in results_df.iterrows():
-            model_name = str(row['model']).split('/')[-1]
+            model_name = str(row["model"]).split("/")[-1]
             label = f"{model_name}\n{row['precision']}"
             ax1.annotate(
                 label,
-                (row['mean_latency_s'], row['mean_peak_mem_mb']),
+                (row["mean_latency_s"], row["mean_peak_mem_mb"]),
                 fontsize=7,
                 alpha=0.8,
-                ha='center'
+                ha="center",
             )
         ax1.set_xlabel("Latency (seconds)")
         ax1.set_ylabel("Peak Memory (MB)")
@@ -225,14 +227,14 @@ class ResultsAnalyzer:
                 # Add model labels
                 for _, row in results_df.iterrows():
                     if acc_col in row and not pd.isna(row[acc_col]):
-                        model_name = str(row['model']).split('/')[-1]
+                        model_name = str(row["model"]).split("/")[-1]
                         label = f"{model_name}\n{row['precision']}"
                         ax2.annotate(
                             label,
-                            (row['energy_kwh'], row[acc_col]),
+                            (row["energy_kwh"], row[acc_col]),
                             fontsize=7,
                             alpha=0.8,
-                            ha='center'
+                            ha="center",
                         )
                 ax2.set_xlabel("Energy (kWh)")
                 ax2.set_ylabel("Accuracy")
@@ -350,7 +352,9 @@ class ResultsAnalyzer:
             summary_stats = pd.concat([summary_stats, energy_stats], axis=1)
 
         # Flatten multi-level column headers
-        summary_stats.columns = ['_'.join(col).strip() for col in summary_stats.columns.values]
+        summary_stats.columns = [
+            "_".join(col).strip() for col in summary_stats.columns.values
+        ]
 
         logger.info("\n" + "#" * 70)
         logger.info("SUMMARY STATISTICS BY PRECISION")

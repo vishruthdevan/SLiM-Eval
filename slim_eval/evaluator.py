@@ -128,7 +128,9 @@ class SLiMEvaluator:
                 )
 
         # Analyzer is always available (only needs pandas, matplotlib)
-        self.analyzer = ResultsAnalyzer(self.output_dir, args.accuracy_tasks)
+        # Use input_dir if provided (for analyze command), otherwise use output_dir
+        input_dir = Path(getattr(args, "input_dir", args.output_dir))
+        self.analyzer = ResultsAnalyzer(input_dir, self.output_dir, args.accuracy_tasks)
 
     def _init_wandb(self):
         """Initialize Weights & Biases logging."""
