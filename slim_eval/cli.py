@@ -197,6 +197,9 @@ def analyze(
     accuracy_tasks: Annotated[
         List[str], typer.Option(help="Accuracy tasks to include in analysis")
     ] = ["mmlu", "gsm8k", "hellaswag"],
+    gpu_index: Annotated[
+        int, typer.Option(help="Select NVIDIA GPU index to use (0-based)")
+    ] = 0,
 ):
     """Analyze and visualize previously saved results."""
     args = _build_args(
@@ -226,6 +229,7 @@ def analyze(
         calibration_split="",
         num_calibration_samples=0,
         max_sequence_length=0,
+        gpu_index=gpu_index,
     )
     evaluator = SLiMEvaluator(args)
     evaluator.analyze_results()
