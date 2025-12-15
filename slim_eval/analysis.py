@@ -190,6 +190,17 @@ class ResultsAnalyzer:
                 s=150,
                 alpha=0.7,
             )
+        # Add model labels
+        for _, row in results_df.iterrows():
+            model_name = str(row['model']).split('/')[-1]
+            label = f"{model_name}\n{row['precision']}"
+            ax1.annotate(
+                label,
+                (row['mean_latency_s'], row['mean_peak_mem_mb']),
+                fontsize=7,
+                alpha=0.8,
+                ha='center'
+            )
         ax1.set_xlabel("Latency (seconds)")
         ax1.set_ylabel("Peak Memory (MB)")
         ax1.set_title("Latency vs Memory")
@@ -211,6 +222,18 @@ class ResultsAnalyzer:
                         s=150,
                         alpha=0.7,
                     )
+                # Add model labels
+                for _, row in results_df.iterrows():
+                    if acc_col in row and not pd.isna(row[acc_col]):
+                        model_name = str(row['model']).split('/')[-1]
+                        label = f"{model_name}\n{row['precision']}"
+                        ax2.annotate(
+                            label,
+                            (row['energy_kwh'], row[acc_col]),
+                            fontsize=7,
+                            alpha=0.8,
+                            ha='center'
+                        )
                 ax2.set_xlabel("Energy (kWh)")
                 ax2.set_ylabel("Accuracy")
                 ax2.set_title("Energy vs Accuracy Trade-off")
@@ -325,6 +348,9 @@ class ResultsAnalyzer:
                 .round(4)
             )
             summary_stats = pd.concat([summary_stats, energy_stats], axis=1)
+
+        # Flatten multi-level column headers
+        summary_stats.columns = ['_'.join(col).strip() for col in summary_stats.columns.values]
 
         logger.info("\n" + "#" * 70)
         logger.info("SUMMARY STATISTICS BY PRECISION")
