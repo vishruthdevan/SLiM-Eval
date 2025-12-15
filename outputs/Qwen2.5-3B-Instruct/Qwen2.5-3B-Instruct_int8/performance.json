@@ -11,7 +11,7 @@
   "p95_latency_s": 0.1480233073234558,
   "p99_latency_s": 0.19532398382822672,
   "std_latency_s": 0.005251108993739846,
-  "mean_peak_mem_mb": 5035.17236328125,
-  "mean_avg_mem_mb": 81902.625,
+  "mean_peak_mem_mb": 74973.625,
+  "mean_avg_mem_mb": 74985.625,
   "tokens_per_second": 811.9352234639028
 }
