@@ -1,0 +1,334 @@
+## 1. Freeze Scope Immediately (Critical)
+
+You do **not** have time to expand scope. Decide this _today_ and do not change it.
+
+**Freeze the following:**
+
+- Models: exactly the 5 you already ran
+- Precisions: FP16, INT8, INT4 only
+- Hardware: A100 only (mention others as future work if partially run)
+- Tasks: the 3 you already have (e.g., GSM8K, HellaSwag, MMLU)
+
+**Drop or defer**:
+
+- Additional benchmarks
+- Additional quantization methods (GPTQ/AWQ)
+- Any new hardware comparisons unless already complete
+
+This is essential to avoid analysis debt.
+
+---
+
+## 2. Required Post-Processing You Must Do (Before Writing)
+
+Your raw JSONs are good, but **papers do not report raw logs**. You must derive standardized aggregates.
+
+### 2.1 Normalize Metrics Across Models
+
+For **each model × precision**, compute:
+
+**Accuracy**
+
+- Per-task accuracy
+- Macro-average accuracy across tasks (explicitly defined)
+
+**Efficiency**
+
+- Mean latency (s)
+- Tokens/sec
+- Peak memory (GB)
+- Energy per query (J)
+- Total energy per benchmark run (optional)
+
+**Derived metrics (important for contribution)**
+
+- Accuracy drop vs FP16 (%)
+- Speedup vs FP16 (×)
+- Memory reduction vs FP16 (%)
+- Energy reduction vs FP16 (%)
+
+You already have all raw inputs to compute this.
+
+---
+
+### 2.2 Construct Pareto Frontiers (Mandatory)
+
+This is a **core contribution claim**, so you must actually show it.
+
+At minimum:
+
+- Accuracy vs latency
+- Accuracy vs energy per query
+- Accuracy vs memory
+
+For each plot:
+
+- Each point = (model, precision)
+- Highlight Pareto-optimal points
+- Label model + precision
+
+You do **not** need fancy algorithms—simple dominance checks are enough.
+
+---
+
+### 2.3 Sanity Checks (1–2 hours max)
+
+Before writing:
+
+- Verify INT4 never _improves_ accuracy beyond FP16 by large margins
+- Verify monotonic trends (INT4 < INT8 < FP16 for memory/energy)
+- Check for outliers (e.g., Phi-3 INT4 suddenly slower than FP16)
+
+Fix now, not after writing.
+
+---
+
+## 3. Figures & Tables You Must Include
+
+If these are missing, reviewers will consider the work incomplete.
+
+### Tables (at least 3)
+
+**Table 1: Accuracy**
+
+- Rows: models
+- Columns: FP16 / INT8 / INT4 (macro-avg + per-task in appendix)
+
+**Table 2: Efficiency**
+
+- Latency, memory, energy per query (one precision per column)
+    
+
+**Table 3: Relative Trade-offs**
+
+- % accuracy drop
+- × speedup
+- % memory reduction
+- % energy reduction
+
+---
+
+### Figures (at least 3)
+
+1. **Accuracy vs Latency Pareto plot**
+2. **Accuracy vs Energy Pareto plot**
+3. **Quantization impact bar chart** (accuracy drop vs precision)
+
+Optional but good:
+
+- Tokens/sec vs memory
+- Radar chart per model (appendix)
+
+---
+
+## 4. Day-by-Day Execution Plan
+
+### **Dec 15 (Today): Data → Paper-Ready Artifacts**
+
+**Goal: No raw JSON remains unprocessed**
+
+- Aggregate all metrics into a single CSV/DataFrame
+- Compute all deltas vs FP16
+- Generate all tables (even rough)
+- Generate all plots (can be ugly, must be correct)
+
+Deliverable by end of day:
+
+- `results.csv`
+    
+- `fig1_accuracy_latency.pdf`
+    
+- `fig2_accuracy_energy.pdf`
+    
+- `table_accuracy.tex`
+    
+- `table_efficiency.tex`
+
+No writing yet beyond notes.
+
+---
+
+### **Dec 16: Write Core Sections (50–60% of paper)**
+
+Write in this order:
+
+1. **Introduction**
+    
+    - Problem: accuracy-only evaluation is misleading for SLMs
+        
+    - Concrete motivating example (65% vs 70% accuracy trade-off)
+        
+    - Your contributions (bullet list)
+        
+2. **Background & Related Work**
+    
+    - Position vs HELM, SLM-Bench
+        
+    - Explicitly state what they _do not measure_
+        
+3. **SLiM-Eval Framework**
+    
+    - Metrics definition (formal, concise)
+        
+    - Hardware & reproducibility protocol
+        
+    - Quantization setup
+        
+
+Do **not** write Results yet.
+
+---
+
+### **Dec 17: Results & Analysis (Most Important Day)**
+
+This section decides acceptance.
+
+Write:
+
+- Accuracy results (Table 1)
+    
+- Efficiency results (Table 2)
+    
+- Pareto analysis (Figures 1–2)
+    
+- Quantization trade-offs (Table 3)
+    
+
+Every subsection must answer:
+
+> “What practical decision does this enable?”
+
+Example:
+
+> “INT8 Phi-3 dominates FP16 Llama 3.2 across all efficiency metrics with only 1.8% accuracy loss.”
+
+---
+
+### **Dec 18: Discussion, Limitations, Polishing**
+
+Write:
+
+- **Discussion**: When to choose INT4 vs INT8
+    
+- **Implications**: On-device deployment, cost-aware inference
+    
+- **Limitations**:
+    
+    - Single GPU family
+        
+    - Limited task diversity
+        
+    - Static prompts
+        
+
+Add:
+
+- Appendix tables (full per-task results)
+    
+- Reproducibility checklist
+    
+
+Run a full read-through for clarity and consistency.
+
+---
+
+### **Dec 19: Final Pass & Submission**
+
+- Tighten abstract (most important paragraph)
+    
+- Verify figures are referenced in text
+    
+- Check claims strictly match results
+    
+- Ensure contributions are not overstated
+    
+- PDF compile check
+    
+
+---
+
+## 5. Paper Outline (Use This Directly)
+
+**Abstract**
+
+- Problem → method → key quantitative findings
+    
+
+**1. Introduction**
+
+- Motivation
+    
+- Gaps
+    
+- Contributions
+    
+
+**2. Related Work**
+
+- LLM eval
+    
+- SLM eval
+    
+- Quantization benchmarking
+    
+
+**3. SLiM-Eval Framework**
+
+- Metrics
+    
+- Experimental setup
+    
+- Quantization methodology
+    
+
+**4. Experimental Results**
+
+- Accuracy
+    
+- Efficiency
+    
+- Pareto optimality
+    
+- Quantization trade-offs
+    
+
+**5. Discussion**
+
+- Practical guidelines
+    
+- Deployment implications
+    
+
+**6. Limitations & Future Work**
+
+**7. Conclusion**
+
+---
+
+## 6. Common Failure Modes to Avoid
+
+- Claiming “holistic” without showing Pareto fronts
+    
+- Mixing hardware results without controlling for GPU
+    
+- Overloading tables with raw numbers instead of deltas
+    
+- Treating INT4 accuracy loss as “acceptable” without quantifying
+    
+
+---
+
+## Next Action (Immediate)
+
+If you want, next I can:
+
+- Help you **design the exact tables**
+    
+- Draft the **Results section text** using your Phi-3 numbers
+    
+- Help phrase **contribution claims safely**
+    
+- Review your abstract for acceptance-level clarity
+    
+
+Tell me what you want to tackle first.
