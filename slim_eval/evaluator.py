@@ -139,16 +139,16 @@ class SLiMEvaluator:
             if hasattr(self.args, "wandb_api_key") and self.args.wandb_api_key:
                 os.environ["WANDB_API_KEY"] = self.args.wandb_api_key
 
+            # Auto-generate model name for grouping
+            model_name = (
+                self.args.models[0].split("/")[-1] if self.args.models else "unknown"
+            )
+
             # Generate run name if not provided
             if hasattr(self.args, "wandb_run_name") and self.args.wandb_run_name:
                 run_name = self.args.wandb_run_name
             else:
                 # Auto-generate: model_precision (e.g., "Llama-3.2-3B_int8")
-                model_name = (
-                    self.args.models[0].split("/")[-1]
-                    if self.args.models
-                    else "unknown"
-                )
                 run_name = f"{model_name}_{self.args.precision}"
 
             # Prepare config dictionary
