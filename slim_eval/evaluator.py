@@ -1,21 +1,42 @@
-import os
-import wandb
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import torch
-from vllm import LLM
+# Optional heavy dependencies
+try:
+    import torch
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
+try:
+    from vllm import LLM
+
+    VLLM_AVAILABLE = True
+except ImportError:
+    VLLM_AVAILABLE = False
+
+try:
+    import wandb
+
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
 
 from .analysis import ResultsAnalyzer
-from .benchmarks.accuracy import AccuracyBenchmark
-from .benchmarks.energy import EnergyBenchmark
-from .benchmarks.performance import PerformanceBenchmark
-from .quantization import QuantizationManager
-from .utils import clear_cache, get_model_size
+
+# Import benchmarks and utilities only if dependencies are available
+if TORCH_AVAILABLE and VLLM_AVAILABLE:
+    from .benchmarks.accuracy import AccuracyBenchmark
+    from .benchmarks.energy import EnergyBenchmark
+    from .benchmarks.performance import PerformanceBenchmark
+    from .quantization import QuantizationManager
+    from .utils import clear_cache, get_model_size
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +52,22 @@ class SLiMEvaluator:
         """
         self.args = args
         self.wandb_run = None
-        
+
         # Initialize wandb if enabled
-        if getattr(self.args, 'wandb_enabled', False):
-            self._init_wandb()
-        
+        if getattr(self.args, "wandb_enabled", False):
+            if WANDB_AVAILABLE:
+                self._init_wandb()
+            else:
+                logger.warning("wandb not available, skipping initialization")
+
         self.output_dir = Path(args.output_dir)
         self.output_dir.mkdir(exist_ok=True)
 
         self.quantized_models_dir = Path(args.quantized_models_dir)
         self.quantized_models_dir.mkdir(exist_ok=True)
+
+        # Check if heavy dependencies are available for benchmarking
+        self.benchmarking_available = TORCH_AVAILABLE and VLLM_AVAILABLE
 
         # Setup file logging
         log_file = (
@@ -58,7 +85,7 @@ class SLiMEvaluator:
         logger.info(f"Models: {args.models}")
         logger.info(f"Precision: {args.precision}")
 
-        if torch.cuda.is_available():
+        if TORCH_AVAILABLE and torch.cuda.is_available():
             # Select GPU
             try:
                 import os
@@ -73,33 +100,53 @@ class SLiMEvaluator:
             logger.info(
                 f"GPU Memory: {torch.cuda.get_device_properties(self.args.gpu_index).total_memory / 1024**3:.2f} GB"
             )
-        else:
+        elif TORCH_AVAILABLE:
             logger.warning("CUDA not available")
+        else:
+            logger.info("PyTorch not available (analysis mode only)")
 
-        # Initialize components
-        self.quantization_manager = QuantizationManager(args)
-        self.performance_benchmark = PerformanceBenchmark(args)
-        self.energy_benchmark = EnergyBenchmark(args)
-        self.accuracy_benchmark = AccuracyBenchmark(
-            args, self.quantized_models_dir, self.output_dir
-        )
+        # Initialize benchmark components (only if dependencies available)
+        if self.benchmarking_available:
+            self.quantization_manager = QuantizationManager(args)
+            self.performance_benchmark = PerformanceBenchmark(args)
+            self.energy_benchmark = EnergyBenchmark(args)
+            self.accuracy_benchmark = AccuracyBenchmark(
+                args, self.quantized_models_dir, self.output_dir
+            )
+        else:
+            self.quantization_manager = None
+            self.performance_benchmark = None
+            self.energy_benchmark = None
+            self.accuracy_benchmark = None
+            if hasattr(args, "models") and args.models:
+                logger.warning(
+                    "Heavy dependencies (torch, vllm, llmcompressor) not available. "
+                    "Only 'analyze' command will work. "
+                    "To run benchmarks, install with: pip install -e '.[full]'"
+                )
+
+        # Analyzer is always available (only needs pandas, matplotlib)
         self.analyzer = ResultsAnalyzer(self.output_dir, args.accuracy_tasks)
-    
+
     def _init_wandb(self):
         """Initialize Weights & Biases logging."""
         try:
             # Set API key if provided
-            if hasattr(self.args, 'wandb_api_key') and self.args.wandb_api_key:
+            if hasattr(self.args, "wandb_api_key") and self.args.wandb_api_key:
                 os.environ["WANDB_API_KEY"] = self.args.wandb_api_key
-            
+
             # Generate run name if not provided
-            if hasattr(self.args, 'wandb_run_name') and self.args.wandb_run_name:
+            if hasattr(self.args, "wandb_run_name") and self.args.wandb_run_name:
                 run_name = self.args.wandb_run_name
             else:
                 # Auto-generate: model_precision (e.g., "Llama-3.2-3B_int8")
-                model_name = self.args.models[0].split('/')[-1] if self.args.models else "unknown"
+                model_name = (
+                    self.args.models[0].split("/")[-1]
+                    if self.args.models
+                    else "unknown"
+                )
                 run_name = f"{model_name}_{self.args.precision}"
-            
+
             # Prepare config dictionary
             config = {
                 "models": self.args.models,
@@ -114,41 +161,45 @@ class SLiMEvaluator:
                 "enable_energy_tracking": self.args.enable_energy_tracking,
                 "enable_accuracy_tracking": self.args.enable_accuracy_tracking,
             }
-            
+
             # Add accuracy-specific config if enabled
             if self.args.enable_accuracy_tracking:
-                config.update({
-                    "accuracy_tasks": self.args.accuracy_tasks,
-                    "num_fewshot": self.args.num_fewshot,
-                    "accuracy_batch_size": self.args.accuracy_batch_size,
-                })
-            
+                config.update(
+                    {
+                        "accuracy_tasks": self.args.accuracy_tasks,
+                        "num_fewshot": self.args.num_fewshot,
+                        "accuracy_batch_size": self.args.accuracy_batch_size,
+                    }
+                )
+
             # Add quantization config if not fp16
             if self.args.precision != "fp16":
-                config.update({
-                    "calibration_dataset": self.args.calibration_dataset,
-                    "num_calibration_samples": self.args.num_calibration_samples,
-                    "max_sequence_length": self.args.max_sequence_length,
-                })
-            
+                config.update(
+                    {
+                        "calibration_dataset": self.args.calibration_dataset,
+                        "num_calibration_samples": self.args.num_calibration_samples,
+                        "max_sequence_length": self.args.max_sequence_length,
+                    }
+                )
+
             # Initialize wandb
             self.wandb_run = wandb.init(
                 project=self.args.wandb_project,
                 name=run_name,
                 config=config,
                 tags=[self.args.precision, "quantization-benchmark"],
-                group=model_name.split('/')[-1],  # groups runs by model
+                group=model_name.split("/")[-1],  # groups runs by model
             )
-            
+
             logger.info(f"Weights & Biases initialized: {run_name}")
-            
+
         except Exception as e:
             logger.warning(f"Failed to initialize W&B: {e}")
             self.wandb_run = None
-    
+
     def _log_to_wandb(self, results: Dict[str, Any], model_name: str, precision: str):
         """Log results to Weights & Biases.
-        
+
         Args:
             results: Results dictionary to log (flat structure).
             model_name: Name of the model.
@@ -161,7 +212,7 @@ class SLiMEvaluator:
                 "precision": precision,
                 "quantization_scheme": results.get("quantization_scheme", "N/A"),
             }
-            
+
             # Add model info (if available)
             if "num_parameters_b" in results:
                 wandb_metrics["model/num_parameters_b"] = results["num_parameters_b"]
@@ -169,7 +220,7 @@ class SLiMEvaluator:
                 wandb_metrics["model/size_gb_fp16"] = results["size_gb_fp16"]
             if "num_parameters" in results:
                 wandb_metrics["model/num_parameters"] = results["num_parameters"]
-            
+
             # Add performance metrics (if available)
             performance_keys = {
                 "mean_latency_s": "latency/mean_s",
@@ -182,11 +233,11 @@ class SLiMEvaluator:
                 "baseline_memory_mb": "memory/baseline_mb",
                 "tokens_per_second": "throughput/tokens_per_sec",
             }
-            
+
             for result_key, wandb_key in performance_keys.items():
                 if result_key in results:
                     wandb_metrics[wandb_key] = results[result_key]
-            
+
             # Add energy metrics (if available)
             energy_keys = {
                 "energy_kwh": "energy/kwh",
@@ -198,11 +249,11 @@ class SLiMEvaluator:
                 "std_power_watts": "energy/std_power_watts",
                 "energy_per_query_j": "energy/per_query_j",
             }
-            
+
             for result_key, wandb_key in energy_keys.items():
                 if result_key in results:
                     wandb_metrics[wandb_key] = results[result_key]
-            
+
             # Add accuracy metrics (if available)
             for task in self.args.accuracy_tasks:
                 accuracy_key = f"{task}_accuracy"
@@ -213,57 +264,64 @@ class SLiMEvaluator:
 
             # Log all metrics as both logs (for charts) and summary (for comparison)
             wandb.log(wandb_metrics)
-            
+
             # Also set as summary for better comparison view
             for key, value in wandb_metrics.items():
                 wandb.summary[key] = value
-            
+
             # Create a summary table for better visualization
             summary_data = []
-            
+
             # Add performance row if data exists
             if "mean_latency_s" in results:
-                summary_data.append([
-                    "Latency (mean)",
-                    f"{results['mean_latency_s']:.4f} s",
-                    f"{results.get('tokens_per_second', 0):.2f} tok/s",
-                ])
-            
+                summary_data.append(
+                    [
+                        "Latency (mean)",
+                        f"{results['mean_latency_s']:.4f} s",
+                        f"{results.get('tokens_per_second', 0):.2f} tok/s",
+                    ]
+                )
+
             if "mean_peak_mem_mb" in results:
-                summary_data.append([
-                    "Memory (peak)",
-                    f"{results['mean_peak_mem_mb']:.2f} MB",
-                    f"{results.get('baseline_memory_mb', 0):.2f} MB baseline",
-                ])
-            
+                summary_data.append(
+                    [
+                        "Memory (peak)",
+                        f"{results['mean_peak_mem_mb']:.2f} MB",
+                        f"{results.get('baseline_memory_mb', 0):.2f} MB baseline",
+                    ]
+                )
+
             # Add energy row if data exists
             if "energy_kwh" in results:
-                summary_data.append([
-                    "Energy",
-                    f"{results['energy_kwh'] * 1000:.4f} Wh",
-                    f"{results['avg_power_watts']:.2f} W avg",
-                ])
-            
+                summary_data.append(
+                    [
+                        "Energy",
+                        f"{results['energy_kwh'] * 1000:.4f} Wh",
+                        f"{results['avg_power_watts']:.2f} W avg",
+                    ]
+                )
+
             # Add accuracy rows
             for task in self.args.accuracy_tasks:
                 accuracy_key = f"{task}_accuracy"
                 if accuracy_key in results:
-                    summary_data.append([
-                        f"Accuracy ({task})",
-                        f"{results[accuracy_key]:.4f}",
-                        f"{results[accuracy_key] * 100:.2f}%",
-                    ])
-            
+                    summary_data.append(
+                        [
+                            f"Accuracy ({task})",
+                            f"{results[accuracy_key]:.4f}",
+                            f"{results[accuracy_key] * 100:.2f}%",
+                        ]
+                    )
+
             # Log summary table
             if summary_data:
                 summary_table = wandb.Table(
-                    columns=["Metric", "Value", "Additional Info"],
-                    data=summary_data
+                    columns=["Metric", "Value", "Additional Info"], data=summary_data
                 )
                 wandb.log({"results_summary": summary_table})
-            
+
             logger.info(f"Logged {len(wandb_metrics)} metrics to W&B")
-            
+
         except Exception as e:
             logger.warning(f"Failed to log to W&B: {e}")
 
@@ -280,6 +338,10 @@ class SLiMEvaluator:
         Returns:
             Loaded vLLM instance or None if loading failed.
         """
+        if not self.benchmarking_available:
+            logger.error("Cannot setup vLLM model: Heavy dependencies not available.")
+            return None
+
         clear_cache()
         try:
             logger.info("=" * 60)
@@ -416,6 +478,10 @@ class SLiMEvaluator:
         Returns:
             Dictionary of results or None if benchmark failed.
         """
+        if not self.benchmarking_available:
+            logger.error("Cannot run benchmark: Heavy dependencies not available.")
+            return None
+
         logger.info("#" * 70)
         logger.info(f"COMPLETE BENCHMARK: {model_name} ({precision.upper()})")
         logger.info("#" * 70)
@@ -586,13 +652,20 @@ class SLiMEvaluator:
                 with open(accuracy_file, "w") as f:
                     json.dump(accuracy_data, f, indent=2)
                 logger.info(f"Saved {task} accuracy results: {accuracy_file}")
-        
+
         # Log to wandb
         if self.wandb_run:
             self._log_to_wandb(results, model_name, precision)
 
     def run_all_benchmarks(self):
         """Run benchmarks for all models with the specified precision."""
+        if not self.benchmarking_available:
+            logger.error(
+                "Cannot run benchmarks: Heavy dependencies not available. \n"
+                "Install with: pip install -e '.[full]'"
+            )
+            return []
+
         precision = self.args.precision  # Single precision now
 
         logger.info("#" * 70)
@@ -619,7 +692,7 @@ class SLiMEvaluator:
         logger.info("#" * 70)
         logger.info("All benchmarks complete!")
         logger.info("#" * 70)
-        
+
         # Finish wandb run
         if self.wandb_run:
             wandb.finish()

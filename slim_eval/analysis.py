@@ -36,43 +36,50 @@ class ResultsAnalyzer:
         """
         all_results = []
 
-        # Find all model_precision directories
+        # Find all model directories (first level)
         for model_dir in self.output_dir.iterdir():
             if not model_dir.is_dir():
                 continue
 
-            # Skip if it doesn't look like a model_precision directory
-            if not any(f.suffix == ".json" for f in model_dir.iterdir() if f.is_file()):
-                continue
+            # Look for model_precision subdirectories (second level)
+            for precision_dir in model_dir.iterdir():
+                if not precision_dir.is_dir():
+                    continue
 
-            result = {}
+                # Skip if it doesn't contain JSON files
+                if not any(
+                    f.suffix == ".json" for f in precision_dir.iterdir() if f.is_file()
+                ):
+                    continue
 
-            # Load performance.json
-            performance_file = model_dir / "performance.json"
-            if performance_file.exists():
-                with open(performance_file, "r") as f:
-                    result.update(json.load(f))
+                result = {}
 
-            # Load energy.json
-            energy_file = model_dir / "energy.json"
-            if energy_file.exists():
-                with open(energy_file, "r") as f:
-                    energy_data = json.load(f)
-                    # Add energy fields to result
-                    for key, value in energy_data.items():
-                        if key not in result:  # Avoid overwriting metadata
-                            result[key] = value
+                # Load performance.json
+                performance_file = precision_dir / "performance.json"
+                if performance_file.exists():
+                    with open(performance_file, "r") as f:
+                        result.update(json.load(f))
 
-            # Load accuracy JSON files
-            for task in self.accuracy_tasks:
-                accuracy_file = model_dir / f"{task}.json"
-                if accuracy_file.exists():
-                    with open(accuracy_file, "r") as f:
-                        accuracy_data = json.load(f)
-                        result[f"{task}_accuracy"] = accuracy_data.get("accuracy")
+                # Load energy.json
+                energy_file = precision_dir / "energy.json"
+                if energy_file.exists():
+                    with open(energy_file, "r") as f:
+                        energy_data = json.load(f)
+                        # Add energy fields to result
+                        for key, value in energy_data.items():
+                            if key not in result:  # Avoid overwriting metadata
+                                result[key] = value
 
-            if result:
-                all_results.append(result)
+                # Load accuracy JSON files
+                for task in self.accuracy_tasks:
+                    accuracy_file = precision_dir / f"{task}.json"
+                    if accuracy_file.exists():
+                        with open(accuracy_file, "r") as f:
+                            accuracy_data = json.load(f)
+                            result[f"{task}_accuracy"] = accuracy_data.get("accuracy")
+
+                if result:
+                    all_results.append(result)
 
         if not all_results:
             logger.warning("No results found in output directory")
