@@ -34,17 +34,6 @@ export WANDB_API_KEY="your-api-key-here"
 
 slim-eval run \
   --models meta-llama/Llama-3.2-3B-Instruct \
-  --precisions int8 \
-  --tasks "energy performance" \
-  --max-model-len 8192 \
-  --quantized-models-dir /mnt/swordfish-pool2/kavin/slimeval/quantized_models \
-  --output-dir /mnt/swordfish-pool2/kavin/slimeval/outputs \
-  --wandb-enabled \
-  --wandb-project slim-eval \
-  --wandb-run-name "llama3.2-3b-int8-energy-perf"
-
-slim-eval run \
-  --models meta-llama/Llama-3.2-3B-Instruct \
   --precision fp16 \
   --tasks "energy performance" \
   --max-model-len 8192 \
@@ -53,3 +42,6 @@ slim-eval run \
   --wandb-enabled \
   --wandb-project slim-eval \
   --wandb-run-name "testing fp16 Llama-3.2-3B-Instruct"
+
+// analyse
+slim-eval analyze --input-dir outputs --output-dir analysis_results
