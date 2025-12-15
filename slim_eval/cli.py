@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 from enum import Enum
 from typing import List, Optional
 
@@ -130,14 +130,13 @@ def run(
     wandb_enabled: Annotated[
         bool, typer.Option(help="Enable Weights & Biases logging")
     ] = True,
-    wandb_project: Annotated[
-        str, typer.Option(help="W&B project name")
-    ] = "slim-eval",
+    wandb_project: Annotated[str, typer.Option(help="W&B project name")] = "slim-eval",
     wandb_api_key: Annotated[
         str, typer.Option(help="W&B API key (or set WANDB_API_KEY env var)")
     ] = "",
     wandb_run_name: Annotated[
-        str, typer.Option(help="W&B run name template (leave empty for auto-generation)")
+        str,
+        typer.Option(help="W&B run name template (leave empty for auto-generation)"),
     ] = "",
 ):
     """Run complete benchmarks for models with specified precision."""
@@ -191,8 +190,12 @@ def run(
 
 @app.command()
 def analyze(
+    input_dir: Annotated[
+        str, typer.Option(help="Directory containing benchmark results to analyze")
+    ] = "outputs",
     output_dir: Annotated[
-        str, typer.Option(help="Directory containing results")
+        str,
+        typer.Option(help="Directory to write analysis results (plots, CSVs, etc.)"),
     ] = "outputs",
     accuracy_tasks: Annotated[
         List[str], typer.Option(help="Accuracy tasks to include in analysis")
@@ -205,6 +208,7 @@ def analyze(
     args = _build_args(
         models=[],
         precision="fp16",
+        input_dir=input_dir,
         output_dir=output_dir,
         quantized_models_dir="quantized-models",
         num_warmup=0,
