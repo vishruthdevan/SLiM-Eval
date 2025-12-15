@@ -4,7 +4,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 # Optional heavy dependencies
 try:
@@ -20,6 +20,8 @@ try:
     VLLM_AVAILABLE = True
 except ImportError:
     VLLM_AVAILABLE = False
+    if TYPE_CHECKING:
+        from vllm import LLM
 
 try:
     import wandb
@@ -327,7 +329,7 @@ class SLiMEvaluator:
 
     def setup_vllm_model(
         self, model_name: str, precision: str, use_quantized_dir: bool = True
-    ) -> Optional[LLM]:
+    ) -> Optional["LLM"]:
         """Setup and load a vLLM model.
 
         Args:

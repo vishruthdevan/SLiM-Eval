@@ -219,19 +219,28 @@ class ResultsAnalyzer:
 
         # Throughput bar chart
         ax3 = axes[1, 0]
-        models_short = results_df["model"].astype(str).str.split("/").str[-1]
-        x_positions = range(len(results_df))
+        unique_models = results_df["model"].unique()
+        models_short = [str(m).split("/")[-1] for m in unique_models]
+        x_positions = range(len(unique_models))
         bar_width = 0.25
-        precisions = results_df["precision"].unique()
+        precisions = sorted(results_df["precision"].unique())
+
         for i, precision in enumerate(precisions):
-            data = results_df[results_df["precision"] == precision]
-            indices = data.index
-            positions = [
-                x_positions[idx] + i * bar_width for idx in range(len(indices))
-            ]
+            throughputs = []
+            for model in unique_models:
+                model_data = results_df[
+                    (results_df["model"] == model)
+                    & (results_df["precision"] == precision)
+                ]
+                if len(model_data) > 0:
+                    throughputs.append(model_data["tokens_per_second"].values[0])
+                else:
+                    throughputs.append(0)
+
+            positions = [x + i * bar_width for x in x_positions]
             ax3.bar(
                 positions,
-                data["tokens_per_second"],
+                throughputs,
                 width=bar_width,
                 label=str(precision).upper(),
                 alpha=0.7,
@@ -240,9 +249,7 @@ class ResultsAnalyzer:
         ax3.set_ylabel("Tokens/Second")
         ax3.set_title("Throughput by Model and Precision")
         ax3.set_xticks([p + bar_width for p in x_positions])
-        ax3.set_xticklabels(
-            [models_short[i] for i in range(len(models_short))], rotation=45, ha="right"
-        )
+        ax3.set_xticklabels(models_short, rotation=45, ha="right")
         ax3.legend()
 
         # Accuracy bar chart
@@ -255,15 +262,23 @@ class ResultsAnalyzer:
         )
         if has_valid_accuracy:
             results_df["avg_accuracy"] = results_df[accuracy_cols].mean(axis=1)
+
             for i, precision in enumerate(precisions):
-                data = results_df[results_df["precision"] == precision]
-                indices = data.index
-                positions = [
-                    x_positions[idx] + i * bar_width for idx in range(len(indices))
-                ]
+                accuracies = []
+                for model in unique_models:
+                    model_data = results_df[
+                        (results_df["model"] == model)
+                        & (results_df["precision"] == precision)
+                    ]
+                    if len(model_data) > 0:
+                        accuracies.append(model_data["avg_accuracy"].values[0])
+                    else:
+                        accuracies.append(0)
+
+                positions = [x + i * bar_width for x in x_positions]
                 ax4.bar(
                     positions,
-                    data["avg_accuracy"],
+                    accuracies,
                     width=bar_width,
                     label=str(precision).upper(),
                     alpha=0.7,
@@ -272,11 +287,7 @@ class ResultsAnalyzer:
             ax4.set_ylabel("Average Accuracy")
             ax4.set_title("Average Accuracy Across Tasks")
             ax4.set_xticks([p + bar_width for p in x_positions])
-            ax4.set_xticklabels(
-                [models_short[i] for i in range(len(models_short))],
-                rotation=45,
-                ha="right",
-            )
+            ax4.set_xticklabels(models_short, rotation=45, ha="right")
             ax4.legend()
         else:
             ax4.text(
