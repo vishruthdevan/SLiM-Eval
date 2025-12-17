@@ -354,8 +354,21 @@ class SLiMEvaluator:
             logger.info(f"Loading {model_name} in {precision.upper()} precision...")
             logger.info("=" * 60)
 
+            model_short_name = model_name.split("/")[-1]
+
             if precision == "fp16":
-                model_path = model_name
+                # Check if we have a local copy in the quantized models directory
+                fp16_path = self.quantized_models_dir / f"{model_short_name}_fp16"
+
+                if fp16_path.exists() and (fp16_path / "config.json").exists():
+                    model_path = str(fp16_path)
+                    logger.info(f"Using local FP16 model from: {fp16_path}")
+                else:
+                    # Download and save the FP16 model locally
+                    logger.info(f"Downloading and saving FP16 model to: {fp16_path}")
+                    self._save_fp16_model(model_name, fp16_path)
+                    model_path = str(fp16_path)
+
                 model_lower = model_name.lower()
 
                 # Model-specific dtype based on HuggingFace documentation
@@ -377,7 +390,6 @@ class SLiMEvaluator:
                     dtype = "float16"
                 quantization = None
             else:
-                model_short_name = model_name.split("/")[-1]
                 quantized_path = (
                     self.quantized_models_dir / f"{model_short_name}_{precision}"
                 )
@@ -474,6 +486,56 @@ class SLiMEvaluator:
             )
             return None
 
+    def _save_fp16_model(self, model_name: str, output_dir: Path) -> None:
+        """Download and save an FP16 model locally.
+
+        Args:
+            model_name: HuggingFace model name or local path.
+            output_dir: Directory to save the model.
+        """
+        import gc
+
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        logger.info("=" * 60)
+        logger.info(f"Downloading {model_name} for local storage")
+        logger.info(f"Output: {output_dir}")
+        logger.info("=" * 60)
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            logger.info("Loading model and tokenizer from HuggingFace...")
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.bfloat16,
+                trust_remote_code=True,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name, trust_remote_code=True
+            )
+
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+                tokenizer.pad_token_id = tokenizer.eos_token_id
+
+            logger.info(f"Saving model to {output_dir}...")
+            model.save_pretrained(output_dir)
+            tokenizer.save_pretrained(output_dir)
+
+            logger.info(f"FP16 model saved successfully: {output_dir}")
+
+            # Cleanup
+            del model
+            del tokenizer
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        except Exception as e:
+            logger.error(f"Failed to save FP16 model: {e}", exc_info=True)
+            raise
+
     def run_complete_benchmark(self, model_name: str, precision: str) -> Optional[Dict]:
         """Run complete benchmark suite for a model configuration.
 
@@ -493,20 +555,34 @@ class SLiMEvaluator:
         logger.info("#" * 70)
 
         model_size_info = get_model_size(model_name)
+        model_short_name = model_name.split("/")[-1]
+
         logger.info(
             f"Model size: {model_size_info['num_parameters_b']:.2f}B parameters "
-            f"({model_size_info['size_gb_fp16']:.2f} GB in FP16)"
+            f"(~{model_size_info['size_gb_fp16']:.2f} GB theoretical in FP16)"
         )
 
-        # Get quantization scheme name and calculate quantized model size
+        # Get quantization scheme name and calculate actual model size from disk
         if precision == "fp16":
             scheme_name = "FP16"
-            size_gb_quantized = model_size_info["size_gb_fp16"]
+            # Calculate actual FP16 model size from disk
+            fp16_path = self.quantized_models_dir / f"{model_short_name}_fp16"
+            # Ensure the model is downloaded first (setup_vllm_model will do this)
+            if fp16_path.exists() and (fp16_path / "config.json").exists():
+                size_gb_quantized = get_quantized_model_size(str(fp16_path))
+                logger.info(
+                    f"Actual FP16 model size from disk: {size_gb_quantized:.2f} GB"
+                )
+            else:
+                # Model will be downloaded during setup_vllm_model, use theoretical for now
+                size_gb_quantized = model_size_info["size_gb_fp16"]
+                logger.info(
+                    "FP16 model not yet downloaded, will calculate size after download"
+                )
         else:
             quant_config = self.quantization_manager.get_quantization_config(precision)
             scheme_name = quant_config.get("scheme_name", precision.upper())
             # Calculate actual quantized model size from disk
-            model_short_name = model_name.split("/")[-1]
             quantized_path = (
                 self.quantized_models_dir / f"{model_short_name}_{precision}"
             )
@@ -541,6 +617,14 @@ class SLiMEvaluator:
         if llm is None:
             logger.error("Model setup failed, skipping...")
             return None
+
+        # Recalculate actual model size from disk after setup (model is now downloaded)
+        model_path = self.quantized_models_dir / f"{model_short_name}_{precision}"
+        if model_path.exists():
+            actual_size = get_quantized_model_size(str(model_path))
+            if actual_size > 0:
+                results["size_gb_quantized"] = actual_size
+                logger.info(f"Actual model size from disk: {actual_size:.2f} GB")
 
         try:
             # Run performance benchmark (latency & memory)
@@ -731,4 +815,5 @@ class SLiMEvaluator:
 
     def analyze_results(self):
         """Analyze and visualize results."""
+        self.analyzer.analyze_results()
         self.analyzer.analyze_results()
