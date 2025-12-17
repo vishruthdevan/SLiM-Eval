@@ -38,7 +38,7 @@ if TORCH_AVAILABLE and VLLM_AVAILABLE:
     from .benchmarks.energy import EnergyBenchmark
     from .benchmarks.performance import PerformanceBenchmark
     from .quantization import QuantizationManager
-    from .utils import clear_cache, get_model_size
+    from .utils import clear_cache, get_model_size, get_quantized_model_size
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +222,8 @@ class SLiMEvaluator:
                 wandb_metrics["model/num_parameters_b"] = results["num_parameters_b"]
             if "size_gb_fp16" in results:
                 wandb_metrics["model/size_gb_fp16"] = results["size_gb_fp16"]
+            if "size_gb_quantized" in results:
+                wandb_metrics["model/size_gb_quantized"] = results["size_gb_quantized"]
             if "num_parameters" in results:
                 wandb_metrics["model/num_parameters"] = results["num_parameters"]
 
@@ -496,12 +498,33 @@ class SLiMEvaluator:
             f"({model_size_info['size_gb_fp16']:.2f} GB in FP16)"
         )
 
-        # Get quantization scheme name
+        # Get quantization scheme name and calculate quantized model size
         if precision == "fp16":
             scheme_name = "FP16"
+            size_gb_quantized = model_size_info["size_gb_fp16"]
         else:
             quant_config = self.quantization_manager.get_quantization_config(precision)
             scheme_name = quant_config.get("scheme_name", precision.upper())
+            # Calculate actual quantized model size from disk
+            model_short_name = model_name.split("/")[-1]
+            quantized_path = (
+                self.quantized_models_dir / f"{model_short_name}_{precision}"
+            )
+            size_gb_quantized = get_quantized_model_size(str(quantized_path))
+            if size_gb_quantized > 0:
+                logger.info(f"Quantized model size: {size_gb_quantized:.2f} GB")
+            else:
+                # If we can't get the size from disk, estimate based on precision
+                # int8 ~= fp16/2, int4 ~= fp16/4
+                if precision == "int8":
+                    size_gb_quantized = model_size_info["size_gb_fp16"] / 2
+                elif precision == "int4":
+                    size_gb_quantized = model_size_info["size_gb_fp16"] / 4
+                else:
+                    size_gb_quantized = model_size_info["size_gb_fp16"]
+                logger.info(
+                    f"Estimated quantized model size: {size_gb_quantized:.2f} GB"
+                )
 
         results = {
             "model": model_name,
@@ -511,6 +534,7 @@ class SLiMEvaluator:
             "num_parameters": model_size_info["num_parameters"],
             "num_parameters_b": model_size_info["num_parameters_b"],
             "size_gb_fp16": model_size_info["size_gb_fp16"],
+            "size_gb_quantized": size_gb_quantized,
         }
 
         llm = self.setup_vllm_model(model_name, precision)
@@ -549,6 +573,7 @@ class SLiMEvaluator:
                     "num_parameters": results.get("num_parameters"),
                     "num_parameters_b": results.get("num_parameters_b"),
                     "size_gb_fp16": results.get("size_gb_fp16"),
+                    "size_gb_quantized": results.get("size_gb_quantized"),
                 }
                 results.update(
                     self.accuracy_benchmark.run(
@@ -594,6 +619,7 @@ class SLiMEvaluator:
             "num_parameters": results.get("num_parameters"),
             "num_parameters_b": results.get("num_parameters_b"),
             "size_gb_fp16": results.get("size_gb_fp16"),
+            "size_gb_quantized": results.get("size_gb_quantized"),
         }
 
         # Save performance.json (only if performance data exists)
