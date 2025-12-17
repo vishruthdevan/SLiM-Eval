@@ -4,7 +4,7 @@ SLiM-Eval: Complete Small Language Model Evaluation Framework
 Tracks: Latency, Memory, Energy, and Accuracy
 
 This script provides a production-ready CLI tool for benchmarking small language models
-across multiple precisions and metrics.
+with a specified precision and metrics.
 """
 
 import argparse
@@ -91,7 +91,7 @@ class SLiMEvaluator:
         logger.info("SLiM-Eval initialized")
         logger.info(f"Output directory: {self.output_dir}")
         logger.info(f"Models: {args.models}")
-        logger.info(f"Precisions: {args.precisions}")
+        logger.info(f"Precision: {args.precision}")
 
         # Log GPU info
         if torch.cuda.is_available():
@@ -939,44 +939,38 @@ class SLiMEvaluator:
         logger.info("SLiM-Eval: COMPLETE BENCHMARK SUITE")
         logger.info("#" * 70)
         logger.info(f"Models: {len(self.args.models)}")
-        logger.info(f"Precisions: {self.args.precisions}")
-        logger.info(
-            f"Total configs: {len(self.args.models) * len(self.args.precisions)}"
-        )
+        logger.info(f"Precision: {self.args.precision}")
+        logger.info(f"Total configs: {len(self.args.models)}")
         logger.info("Metrics: Latency, Memory, Energy, Accuracy")
         logger.info(f"Output: {self.results_csv}")
-        logger.info(
-            f"Estimated time: ~{len(self.args.models) * len(self.args.precisions) * 30} minutes"
-        )
+        logger.info(f"Estimated time: ~{len(self.args.models) * 30} minutes")
 
         self.initialize_results_csv()
 
         all_results = []
 
         for model_name in self.args.models:
-            for precision in self.args.precisions:
-                config_id = f"{model_name.split('/')[-1]}_{precision}"
+            precision = self.args.precision
+            config_id = f"{model_name.split('/')[-1]}_{precision}"
 
-                results = self.run_complete_benchmark(model_name, precision)
+            results = self.run_complete_benchmark(model_name, precision)
 
-                if results:
-                    all_results.append(results)
+            if results:
+                all_results.append(results)
 
-                    # Read the existing CSV to get the exact column order
-                    existing_df = pd.read_csv(self.results_csv)
-                    columns = existing_df.columns.tolist()
+                # Read the existing CSV to get the exact column order
+                existing_df = pd.read_csv(self.results_csv)
+                columns = existing_df.columns.tolist()
 
-                    # Create DataFrame with results in the correct column order
-                    results_df = pd.DataFrame([results], columns=columns)
+                # Create DataFrame with results in the correct column order
+                results_df = pd.DataFrame([results], columns=columns)
 
-                    # Append to CSV
-                    results_df.to_csv(
-                        self.results_csv, mode="a", header=False, index=False
-                    )
-                    logger.info(f"Results saved for {config_id}")
+                # Append to CSV
+                results_df.to_csv(self.results_csv, mode="a", header=False, index=False)
+                logger.info(f"Results saved for {config_id}")
 
-                self.clear_cache()
-                time.sleep(5)
+            self.clear_cache()
+            time.sleep(5)
 
         logger.info("#" * 70)
         logger.info("ALL BENCHMARKS COMPLETE!")
@@ -1382,7 +1376,7 @@ class SLiMEvaluator:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "models": self.args.models,
-                "precisions": self.args.precisions,
+                "precision": self.args.precision,
                 "accuracy_tasks": self.args.accuracy_tasks,
                 "num_runs": self.args.num_runs,
                 "batch_size": self.args.batch_size,
@@ -1412,12 +1406,12 @@ def parse_args():
         help="List of model names to evaluate",
     )
     parser.add_argument(
-        "--precisions",
-        nargs="+",
-        default=["fp16", "int8", "int4"],
+        "--precision",
+        type=str,
+        default="fp16",
         choices=["fp16", "int8", "int4", "gptq"],
         help=(
-            "Precisions to test: fp16 (baseline), int8/int4 (SmoothQuant+GPTQ), gptq (GPTQ-only)"
+            "Precision to test: fp16 (baseline), int8/int4 (SmoothQuant+GPTQ), gptq (GPTQ-only)"
         ),
     )
 
