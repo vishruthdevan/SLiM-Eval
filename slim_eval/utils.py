@@ -98,3 +98,35 @@ def get_model_size(model_path: str) -> Dict[str, float]:
     except Exception as e:
         logger.warning(f"Failed to get model size for {model_path}: {e}")
         return {"num_parameters": 0, "num_parameters_b": 0, "size_gb_fp16": 0}
+
+
+def get_quantized_model_size(model_dir: str) -> float:
+    """Get the actual size of a quantized model from disk.
+
+    Calculates the total size of model weight files (safetensors, bin, pt files)
+    in the model directory.
+
+    Args:
+        model_dir: Path to the quantized model directory.
+
+    Returns:
+        Size of the model in GB.
+    """
+    from pathlib import Path
+
+    model_path = Path(model_dir)
+    if not model_path.exists():
+        logger.warning(f"Model directory does not exist: {model_dir}")
+        return 0.0
+
+    # Model weight file extensions
+    weight_extensions = {".safetensors", ".bin", ".pt", ".pth"}
+
+    total_size_bytes = 0
+    for file in model_path.iterdir():
+        if file.is_file() and file.suffix in weight_extensions:
+            total_size_bytes += file.stat().st_size
+
+    size_gb = total_size_bytes / (1024**3)
+    logger.debug(f"Quantized model size for {model_dir}: {size_gb:.4f} GB")
+    return size_gb
