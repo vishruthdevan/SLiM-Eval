@@ -5,7 +5,7 @@
   "timestamp": "2025-12-10T17:25:50.960636",
   "num_parameters": 2434269184,
   "num_parameters_b": 2.434269184,
-  "size_gb_fp16": 4.5341796875,
+  "model_size_gb": 4.907162815332413,
   "mean_latency_s": 0.1477950414419174,
   "median_latency_s": 0.14722508192062378,
   "p95_latency_s": 0.1480233073234558,
