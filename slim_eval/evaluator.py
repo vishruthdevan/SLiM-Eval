@@ -220,10 +220,8 @@ class SLiMEvaluator:
             # Add model info (if available)
             if "num_parameters_b" in results:
                 wandb_metrics["model/num_parameters_b"] = results["num_parameters_b"]
-            if "size_gb_fp16" in results:
-                wandb_metrics["model/size_gb_fp16"] = results["size_gb_fp16"]
-            if "size_gb_quantized" in results:
-                wandb_metrics["model/size_gb_quantized"] = results["size_gb_quantized"]
+            if "model_size_gb" in results:
+                wandb_metrics["model/model_size_gb"] = results["model_size_gb"]
             if "num_parameters" in results:
                 wandb_metrics["model/num_parameters"] = results["num_parameters"]
 
@@ -557,50 +555,16 @@ class SLiMEvaluator:
         model_size_info = get_model_size(model_name)
         model_short_name = model_name.split("/")[-1]
 
-        logger.info(
-            f"Model size: {model_size_info['num_parameters_b']:.2f}B parameters "
-            f"(~{model_size_info['size_gb_fp16']:.2f} GB theoretical in FP16)"
-        )
+        logger.info(f"Model: {model_size_info['num_parameters_b']:.2f}B parameters")
 
-        # Get quantization scheme name and calculate actual model size from disk
+        # Get quantization scheme name
+        model_path = self.quantized_models_dir / f"{model_short_name}_{precision}"
+
         if precision == "fp16":
             scheme_name = "FP16"
-            # Calculate actual FP16 model size from disk
-            fp16_path = self.quantized_models_dir / f"{model_short_name}_fp16"
-            # Ensure the model is downloaded first (setup_vllm_model will do this)
-            if fp16_path.exists() and (fp16_path / "config.json").exists():
-                size_gb_quantized = get_quantized_model_size(str(fp16_path))
-                logger.info(
-                    f"Actual FP16 model size from disk: {size_gb_quantized:.2f} GB"
-                )
-            else:
-                # Model will be downloaded during setup_vllm_model, use theoretical for now
-                size_gb_quantized = model_size_info["size_gb_fp16"]
-                logger.info(
-                    "FP16 model not yet downloaded, will calculate size after download"
-                )
         else:
             quant_config = self.quantization_manager.get_quantization_config(precision)
             scheme_name = quant_config.get("scheme_name", precision.upper())
-            # Calculate actual quantized model size from disk
-            quantized_path = (
-                self.quantized_models_dir / f"{model_short_name}_{precision}"
-            )
-            size_gb_quantized = get_quantized_model_size(str(quantized_path))
-            if size_gb_quantized > 0:
-                logger.info(f"Quantized model size: {size_gb_quantized:.2f} GB")
-            else:
-                # If we can't get the size from disk, estimate based on precision
-                # int8 ~= fp16/2, int4 ~= fp16/4
-                if precision == "int8":
-                    size_gb_quantized = model_size_info["size_gb_fp16"] / 2
-                elif precision == "int4":
-                    size_gb_quantized = model_size_info["size_gb_fp16"] / 4
-                else:
-                    size_gb_quantized = model_size_info["size_gb_fp16"]
-                logger.info(
-                    f"Estimated quantized model size: {size_gb_quantized:.2f} GB"
-                )
 
         results = {
             "model": model_name,
@@ -609,8 +573,7 @@ class SLiMEvaluator:
             "timestamp": datetime.now().isoformat(),
             "num_parameters": model_size_info["num_parameters"],
             "num_parameters_b": model_size_info["num_parameters_b"],
-            "size_gb_fp16": model_size_info["size_gb_fp16"],
-            "size_gb_quantized": size_gb_quantized,
+            "model_size_gb": 0.0,  # Will be calculated after model is downloaded
         }
 
         llm = self.setup_vllm_model(model_name, precision)
@@ -618,12 +581,11 @@ class SLiMEvaluator:
             logger.error("Model setup failed, skipping...")
             return None
 
-        # Recalculate actual model size from disk after setup (model is now downloaded)
-        model_path = self.quantized_models_dir / f"{model_short_name}_{precision}"
+        # Calculate actual model size from disk after setup (model is now downloaded)
         if model_path.exists():
             actual_size = get_quantized_model_size(str(model_path))
             if actual_size > 0:
-                results["size_gb_quantized"] = actual_size
+                results["model_size_gb"] = actual_size
                 logger.info(f"Actual model size from disk: {actual_size:.2f} GB")
 
         try:
@@ -656,8 +618,7 @@ class SLiMEvaluator:
                     "timestamp": results.get("timestamp"),
                     "num_parameters": results.get("num_parameters"),
                     "num_parameters_b": results.get("num_parameters_b"),
-                    "size_gb_fp16": results.get("size_gb_fp16"),
-                    "size_gb_quantized": results.get("size_gb_quantized"),
+                    "model_size_gb": results.get("model_size_gb"),
                 }
                 results.update(
                     self.accuracy_benchmark.run(
@@ -702,8 +663,7 @@ class SLiMEvaluator:
             "timestamp": results.get("timestamp"),
             "num_parameters": results.get("num_parameters"),
             "num_parameters_b": results.get("num_parameters_b"),
-            "size_gb_fp16": results.get("size_gb_fp16"),
-            "size_gb_quantized": results.get("size_gb_quantized"),
+            "model_size_gb": results.get("model_size_gb"),
         }
 
         # Save performance.json (only if performance data exists)
