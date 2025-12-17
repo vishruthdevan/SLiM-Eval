@@ -75,7 +75,7 @@ def run(
     ] = 256,
     gpu_memory_utilization: Annotated[
         float, typer.Option(help="GPU memory utilization fraction")
-    ] = 0.9,
+    ] = 0.8,
     max_model_len: Annotated[
         int, typer.Option(help="Maximum model context length")
     ] = 8192,
