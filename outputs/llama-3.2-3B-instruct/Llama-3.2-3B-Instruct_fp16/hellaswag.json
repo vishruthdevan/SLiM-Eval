@@ -5,7 +5,7 @@
   "timestamp": "2025-12-08T22:17:07.069584",
   "num_parameters": 3958898688,
   "num_parameters_b": 3.958898688,
-  "size_gb_fp16": 7.3740234375,
+  "model_size_gb": 5.984240256249905,
   "task": "hellaswag",
   "accuracy": 0.5277833100975902
 }
