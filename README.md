@@ -62,12 +62,7 @@ We recommend using [uv](https://github.com/astral-sh/uv) for fast, reliable Pyth
 ```bash
 uv venv
 source .venv/bin/activate
-
-# Clone the repository
-git clone https://github.com/vishruthdevan/SLiM-Eval.git
-
-# Install dependencies
-uv pip install -e "SLiM-Eval[all]"
+uv pip install "slim-eval[all]"
 ```
 
 ## Quick Start
