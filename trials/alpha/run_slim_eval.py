@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-SLiM-Eval: Complete Small Language Model Evaluation Framework
-Tracks: Latency, Memory, Energy, and Accuracy
-
-This script provides a production-ready CLI tool for benchmarking small language models
-with a specified precision and metrics.
-"""
-
 import argparse
 import gc
 import json
