@@ -5,26 +5,30 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Abstract
+## Team Information
 
-Small language models (SLMs, 1-7B parameters) are increasingly deployed in production systems where efficiency is as critical as accuracy, yet existing evaluations largely ignore deployment-critical metrics such as latency, throughput, memory, and energy. We present **SLiM-Eval**, a systematic evaluation of accuracy–efficiency trade-offs under quantization, benchmarking five instruction-tuned SLMs (Qwen2.5-3B, Llama-3.2-3B, Phi-3-mini-4k, Gemma-3-4B, and Mistral-7B) across FP16, INT8, and INT4 precision on MMLU, GSM8K, and HellaSwag, with over 200 hours of controlled experiments on NVIDIA A100 GPUs.
+- **Team Name**: SLiM-Eval
+- **Members**:
+  - Kavin Aravindhan Rajkumar (kr3131)
+  - Vishruth Devan (vd2461)
 
-**Key Findings:**
+---
 
-- **INT8 achieves 1.3–2.2× speedup** with <2% accuracy loss for most models
-- **Mathematical reasoning degrades 3–10× more** than factual tasks under quantization
-- **Quantization effectiveness varies strongly by architecture** (2.18× speedup for Llama-3.2-3B vs. 0.99× regression for Qwen2.5-3B)
-- **Pareto frontier analysis** reveals unavoidable trade-offs between accuracy, latency, and energy
+## 1. Problem Statement
 
-**Optimal Configurations Identified:**
+Current SLM evaluation practices suffer from three fundamental and interconnected gaps:
 
-| Configuration | Best For | Key Metrics |
-|---------------|----------|-------------|
-| Llama-3.2-3B (INT8) | Balanced | 99 ms latency, 60.2% avg accuracy, 35% energy reduction |
-| Phi-3-mini (FP16) | Accuracy | 70.1% average accuracy |
-| Llama-3.2-3B (INT4) | Energy | 0.011 kWh, 57.0% avg accuracy, 1936 tokens/s |
+**Gap 1: Efficiency-Blind Benchmarking.** Standard evaluation protocols measure correctness (accuracy, F1, BLEU) while ignoring dimensions critical for deployment: inference latency, throughput, memory footprint, and energy consumption. A model ranking first on MMLU may rank last in production viability due to prohibitive latency or energy costs.
 
-📊 **[View Full Experiment Logs on Weights & Biases](https://wandb.ai/vishruthd-team/slim-eval)**
+**Gap 2: Absence of Quantization-Aware Evaluation.** While quantization is ubiquitous in production systems, existing benchmarks evaluate models predominantly at baseline precision (FP16/FP32). The relationship between quantization aggressiveness and task-specific accuracy degradation remains uncharacterized, forcing practitioners into conservative precision choices that sacrifice efficiency gains.
+
+**Gap 3: Lack of Multi-Objective Optimization Frameworks.** SLM deployment inherently requires balancing conflicting objectives like maximizing accuracy while minimizing latency, memory, and energy. However, benchmarks report single-dimensional rankings rather than multi-objective trade-off analyses revealing optimal deployment configurations.
+
+To address these gaps, we introduce **SLiM-Eval**, a systematic framework for evaluating SLMs across accuracy–efficiency trade-offs under quantization. We evaluate five representative instruction-tuned SLMs (Qwen2.5-3B, Llama-3.2-3B, Phi-3-mini-4k, Gemma-3-4B, and Mistral-7B) across FP16, INT8, and INT4 precision on MMLU, GSM8K, and HellaSwag, with over 200 hours of controlled experiments on NVIDIA A100 GPUs.
+
+📊 **[View Full Experiment Logs on Weights & Biases](https://wandb.ai/slim-eval/slim-eval/reports/SLiM-Eval-Systematic-Evaluation-of-Quantization-Trade-offs-in-Small-Language-Models--VmlldzoxNTQwNjM2Ng?accessToken=lo8foveel7p8681kqe9nm949vt7rnmg8yrtg6t2yn5i8xq9gs7iq60kqz8kzckgc)**
+
+---
 
 ## Overview
 
