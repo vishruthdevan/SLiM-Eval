@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-full = [
+all = [
     # Core PyTorch (required for model evaluation)
     "torch==2.8.0",
     "torchvision==0.23.0",
