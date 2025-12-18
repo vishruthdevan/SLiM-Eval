@@ -215,7 +215,6 @@ llama3.2-3B-local/
 quantized-models/
 wandb/
 outputs/analysis/
-analysis_results/
 
 # Helper scripts
 full_script.sh

@@ -1,0 +1,4 @@
+precision,mean_latency_s_mean,mean_latency_s_std,mean_latency_s_min,mean_latency_s_max,mean_peak_mem_mb_mean,mean_peak_mem_mb_std,mean_peak_mem_mb_min,mean_peak_mem_mb_max,tokens_per_second_mean,tokens_per_second_std,tokens_per_second_min,tokens_per_second_max,energy_kwh_mean,energy_kwh_std,avg_power_watts_mean,avg_power_watts_std
+fp16,0.2084,0.045,0.1458,0.2598,75088.625,487.4587,74380.625,75630.625,1026.6245,197.1015,714.6926,1189.2299,0.025,0.0082,257.4553,18.9736
+int4,0.1584,0.0543,0.1127,0.2361,75296.625,295.0571,74954.625,75618.625,1505.9776,354.1026,1084.2027,1936.1319,0.0117,0.0018,195.9194,40.8667
+int8,0.1382,0.0341,0.0989,0.1796,75128.375,268.9664,74882.625,75490.625,1185.8129,339.3222,811.9352,1517.0678,0.0154,0.0041,195.4694,35.0891
