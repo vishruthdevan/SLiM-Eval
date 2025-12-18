@@ -5,6 +5,27 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+## Abstract
+
+Small language models (SLMs, 1-7B parameters) are increasingly deployed in production systems where efficiency is as critical as accuracy, yet existing evaluations largely ignore deployment-critical metrics such as latency, throughput, memory, and energy. We present **SLiM-Eval**, a systematic evaluation of accuracy–efficiency trade-offs under quantization, benchmarking five instruction-tuned SLMs (Qwen2.5-3B, Llama-3.2-3B, Phi-3-mini-4k, Gemma-3-4B, and Mistral-7B) across FP16, INT8, and INT4 precision on MMLU, GSM8K, and HellaSwag, with over 200 hours of controlled experiments on NVIDIA A100 GPUs.
+
+**Key Findings:**
+
+- **INT8 achieves 1.3–2.2× speedup** with <2% accuracy loss for most models
+- **Mathematical reasoning degrades 3–10× more** than factual tasks under quantization
+- **Quantization effectiveness varies strongly by architecture** (2.18× speedup for Llama-3.2-3B vs. 0.99× regression for Qwen2.5-3B)
+- **Pareto frontier analysis** reveals unavoidable trade-offs between accuracy, latency, and energy
+
+**Optimal Configurations Identified:**
+
+| Configuration | Best For | Key Metrics |
+|---------------|----------|-------------|
+| Llama-3.2-3B (INT8) | Balanced | 99 ms latency, 60.2% avg accuracy, 35% energy reduction |
+| Phi-3-mini (FP16) | Accuracy | 70.1% average accuracy |
+| Llama-3.2-3B (INT4) | Energy | 0.011 kWh, 57.0% avg accuracy, 1936 tokens/s |
+
+📊 **[View Full Experiment Logs on Weights & Biases](https://wandb.ai/vishruthd-team/slim-eval)**
+
 ## Overview
 
 SLiM-Eval is a unified framework for evaluating Large Language Models (LLMs) with different quantization strategies. It measures:
@@ -37,7 +58,7 @@ git clone https://github.com/vishruthdevan/SLiM-Eval.git
 cd SLiM-Eval
 
 # Install dependencies
-pip install -e .
+pip install -e ".[all]"
 
 # Optional: Install Jupyter for notebooks
 pip install -e ".[dev]"
@@ -201,21 +222,43 @@ slim-eval analyze \
 - `--accuracy-tasks`: Accuracy tasks to include in analysis (default: `mmlu gsm8k hellaswag`)
 - `--gpu-index`: Select NVIDIA GPU index to use (default: 0)
 
-## Architecture
+## Repository Structure
 
 ```text
-slim_eval/
-├── cli.py                  # Command-line interface
-├── evaluator.py            # Main orchestrator
-├── quantization.py         # Quantization management
-├── analysis.py             # Results visualization
-├── utils.py                # Utilities (caching, model info)
-└── benchmarks/
-    ├── base.py             # Base benchmark class
-    ├── performance.py      # Latency & memory tracking
-    ├── energy.py           # Power consumption monitoring
-    └── accuracy.py         # lm-eval integration
+SLiM-Eval/
+├── slim_eval/                      # Main package
+│   ├── __init__.py
+│   ├── cli.py                      # Command-line interface (Typer-based)
+│   ├── evaluator.py                # Main orchestrator for benchmarks
+│   ├── quantization.py             # GPTQ quantization management
+│   ├── analysis.py                 # Results visualization & analysis
+│   ├── utils.py                    # Utilities (caching, model info)
+│   └── benchmarks/
+│       ├── __init__.py
+│       ├── base.py                 # Base benchmark class
+│       ├── performance.py          # Latency & memory tracking (vLLM)
+│       ├── energy.py               # Power consumption monitoring (NVML)
+│       └── accuracy.py             # lm-eval integration
+├── outputs/                        # Benchmark results (per model/precision)
+├── quantized-models/               # Cached quantized models
+├── analysis_results/               # Generated plots and analysis
+│   └── plots/                      # Visualization outputs
+├── pyproject.toml                  # Package configuration & dependencies
+├── README.md                       # This file
+└── LICENSE                         # MIT License
 ```
+
+### Core Components
+
+| Component | Description |
+|-----------|-------------|
+| `cli.py` | Typer-based CLI with `run` and `analyze` commands |
+| `evaluator.py` | Orchestrates model loading, quantization, and benchmark execution |
+| `quantization.py` | GPTQ quantization using llmcompressor with calibration |
+| `benchmarks/performance.py` | Measures TTFT, TPOT, E2E latency, throughput via vLLM |
+| `benchmarks/energy.py` | GPU power monitoring using NVIDIA Management Library |
+| `benchmarks/accuracy.py` | Wraps lm-evaluation-harness for MMLU, GSM8K, HellaSwag |
+| `analysis.py` | Generates plots, Pareto analysis, and summary statistics |
 
 ## Output Files
 
@@ -269,6 +312,104 @@ quantized-models/
 
 To force re-quantization, delete the corresponding directory in `quantized-models/`.
 
+## Results
+
+### Models Evaluated
+
+We benchmarked 5 instruction-tuned small language models across 3 precision modes (FP16, INT8, INT4):
+
+| Model | Parameters | Size (FP16) |
+|-------|------------|-------------|
+| Qwen2.5-3B-Instruct | 2.43B | 5.75 GB |
+| Llama-3.2-3B-Instruct | 3.96B | 5.98 GB |
+| Phi-3-mini-4k-instruct | 3.82B | 7.12 GB |
+| Gemma-3-4B-it | 4.30B | 8.64 GB |
+| Mistral-7B-Instruct-v0.3 | 6.71B | 13.50 GB |
+
+### Complete Results Table
+
+| Model | Precision | Latency (ms) | Tokens/s | Energy (kWh) | MMLU | GSM8K | HellaSwag |
+|-------|-----------|-------------|----------|--------------|------|-------|-----------|
+| Llama-3.2-3B-Instruct | fp16 | 215.2 | 1189.2 | 0.021 | 60.5% | 67.8% | 52.8% |
+| Llama-3.2-3B-Instruct | int8 | **98.9** | 1517.1 | 0.014 | 60.5% | 67.2% | 52.8% |
+| Llama-3.2-3B-Instruct | int4 | 132.2 | **1936.1** | **0.011** | 58.8% | 60.1% | 52.0% |
+| Phi-3-mini-4k-instruct | fp16 | 237.8 | 1076.7 | 0.021 | **70.5%** | **79.8%** | 60.0% |
+| Phi-3-mini-4k-instruct | int8 | 179.6 | 1425.1 | 0.012 | 69.5% | 72.6% | 59.6% |
+| Phi-3-mini-4k-instruct | int4 | 236.1 | 1084.2 | 0.011 | 68.3% | 71.8% | 58.5% |
+| Qwen2.5-3B-Instruct | fp16 | 145.8 | 1186.3 | 0.017 | 66.4% | 65.7% | 56.0% |
+| Qwen2.5-3B-Instruct | int8 | 147.8 | 811.9 | 0.015 | 65.6% | 64.9% | 55.2% |
+| Qwen2.5-3B-Instruct | int4 | 152.7 | 1583.0 | 0.011 | 64.2% | 53.5% | 54.9% |
+| Mistral-7B-Instruct-v0.3 | fp16 | 183.3 | 714.7 | 0.038 | 61.8% | 50.0% | **65.9%** |
+| Mistral-7B-Instruct-v0.3 | int8 | 126.4 | 989.2 | 0.021 | 61.7% | 47.1% | 65.7% |
+| Mistral-7B-Instruct-v0.3 | int4 | 112.7 | 1420.5 | 0.014 | 60.6% | 45.5% | 65.4% |
+| Gemma-3-4B-it | fp16 | 259.8 | 966.2 | 0.027 | 58.4% | 76.4% | 56.0% |
+
+### Quantization Impact Analysis
+
+| Model | Precision | Speedup | Energy Reduction | MMLU Drop | GSM8K Drop | HellaSwag Drop |
+|-------|-----------|---------|------------------|-----------|------------|----------------|
+| Llama-3.2-3B-Instruct | int8 | **2.18×** | 35.3% | 0.05% | 0.89% | -0.08% |
+| Llama-3.2-3B-Instruct | int4 | 1.63× | 49.1% | 2.89% | 11.30% | 1.57% |
+| Mistral-7B-Instruct-v0.3 | int8 | 1.45× | 45.0% | 0.16% | 5.77% | 0.36% |
+| Mistral-7B-Instruct-v0.3 | int4 | 1.63× | **62.6%** | 1.98% | 8.95% | 0.73% |
+| Phi-3-mini-4k-instruct | int8 | 1.32× | 45.7% | 1.38% | 9.03% | 0.66% |
+| Phi-3-mini-4k-instruct | int4 | 1.01× | 50.6% | 3.16% | 9.98% | 2.49% |
+| Qwen2.5-3B-Instruct | int8 | 0.99× | 12.6% | 1.20% | 1.15% | 1.55% |
+| Qwen2.5-3B-Instruct | int4 | 0.95× | 35.0% | 3.30% | **18.48%** | 1.99% |
+
+### Key Visualizations
+
+#### Accuracy Comparison Across Models and Precisions
+
+![Accuracy Comparison](analysis_results/plots/accuracy_comparison.png)
+
+*Figure 1: Accuracy comparison across all models and precision modes. Phi-3-mini achieves the highest overall accuracy, while mathematical reasoning (GSM8K) shows the most sensitivity to quantization.*
+
+#### Speedup by Model Architecture
+
+![Speedup Analysis](analysis_results/plots/speedup_by_model.png)
+
+*Figure 2: Quantization speedup varies dramatically by architecture. Llama-3.2-3B achieves 2.18× speedup with INT8, while Qwen2.5-3B shows minimal improvement (0.99×).*
+
+#### Pareto Frontier: Latency vs Accuracy
+
+![Pareto Latency-Accuracy](analysis_results/plots/pareto_latency_accuracy.png)
+
+*Figure 3: Pareto frontier analysis reveals optimal configurations. Points on the frontier represent configurations where no other option offers both better latency AND accuracy.*
+
+#### Pareto Frontier: Energy vs Accuracy
+
+![Pareto Energy-Accuracy](analysis_results/plots/pareto_energy_accuracy.png)
+
+*Figure 4: Energy-accuracy trade-off analysis. Llama-3.2-3B (INT4) offers the best energy efficiency while maintaining competitive accuracy.*
+
+#### Task-Specific Accuracy Degradation
+
+![Task Accuracy Degradation](analysis_results/plots/task_accuracy_degradation.png)
+
+*Figure 5: Mathematical reasoning (GSM8K) degrades 3-10× more than factual tasks (MMLU, HellaSwag) under quantization, indicating task-specific sensitivity.*
+
+#### Energy Consumption Analysis
+
+![Energy Consumption](analysis_results/plots/energy_consumption.png)
+
+*Figure 6: Energy consumption per inference across models. INT4 quantization reduces energy by 35-63% compared to FP16 baselines.*
+
+### Key Observations
+
+1. **Architecture-Dependent Quantization Benefits**: Llama-3.2-3B benefits most from INT8 quantization (2.18× speedup), while Qwen2.5-3B shows minimal improvement, suggesting that quantization effectiveness is highly architecture-dependent.
+
+2. **Task Sensitivity**: Mathematical reasoning tasks (GSM8K) are significantly more sensitive to quantization than factual knowledge (MMLU) or commonsense reasoning (HellaSwag). GSM8K accuracy drops 9-18% under INT4, while MMLU drops only 1-3%.
+
+3. **Diminishing Returns with INT4**: While INT4 offers better energy efficiency than INT8, the additional speedup is often marginal (or negative for some models), while accuracy degradation accelerates significantly.
+
+4. **Pareto-Optimal Configurations**:
+   - **For latency-critical applications**: Llama-3.2-3B (INT8) — 98.9ms latency with minimal accuracy loss
+   - **For accuracy-critical applications**: Phi-3-mini (FP16) — 70.1% average accuracy
+   - **For energy-constrained deployments**: Llama-3.2-3B (INT4) — 0.011 kWh per inference, 57.0% avg accuracy
+
+5. **Memory Behavior**: Surprisingly, memory usage remains relatively constant across precision modes due to vLLM's KV cache allocation strategy, suggesting memory savings require explicit KV cache quantization.
+
 ## Key Metrics
 
 ### Performance Metrics
@@ -304,6 +445,34 @@ To force re-quantization, delete the corresponding directory in `quantized-model
 - **`max_model_len`**: Used during **inference** to set vLLM's maximum context window
 
 ## Examples
+
+### Full Evaluation Workflow
+
+Complete example to reproduce our benchmarks:
+
+```bash
+# 1. Set up environment
+export HF_TOKEN=your_huggingface_token
+export WANDB_API_KEY=your_wandb_api_key
+
+# 2. Create and activate virtual environment (using uv)
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[all]"
+
+# 3. Run full benchmark suite for a model across all precisions
+slim-eval run --models "Qwen/Qwen2.5-3B-Instruct" --precision fp16 --max-model-len 8192 \
+  --wandb-enabled --wandb-project slim-eval --wandb-run-name "fp16 Qwen2.5-3B-Instruct"
+
+slim-eval run --models "Qwen/Qwen2.5-3B-Instruct" --precision int8 --max-model-len 8192 \
+  --wandb-enabled --wandb-project slim-eval --wandb-run-name "int8 Qwen2.5-3B-Instruct"
+
+slim-eval run --models "Qwen/Qwen2.5-3B-Instruct" --precision int4 --max-model-len 8192 \
+  --wandb-enabled --wandb-project slim-eval --wandb-run-name "int4 Qwen2.5-3B-Instruct"
+
+# 4. Analyze results and generate visualizations
+slim-eval analyze --input-dir outputs --output-dir analysis_results
+```
 
 ### Compare Multiple Models
 
