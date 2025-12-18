@@ -2,6 +2,7 @@
 
 **Small Language Model Evaluation Framework** — Comprehensive benchmarking for quantized LLMs across performance, energy, and accuracy metrics.
 
+[![PyPI version](https://img.shields.io/pypi/v/slim-eval?color=orange&logo=pypi&logoColor=white)](https://pypi.org/project/slim-eval/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
