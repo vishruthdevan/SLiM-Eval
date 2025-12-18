@@ -3,9 +3,10 @@
   "precision": "fp16",
   "quantization_scheme": "FP16",
   "timestamp": "2025-12-09T15:51:19.013097",
-  "num_parameters": 0,
-  "num_parameters_b": 0.0,
-  "size_gb_fp16": 0.0,
+  "num_parameters": 4300000000,
+  "num_parameters_b": 4.3,
+  "model_size_gb": 8.64,
+  "_note": "Parameter values estimated from official model file size (8.64 GB BF16). llmcompressor/vllm limitations prevented experimental measurement for Gemma 3.",
   "task": "mmlu",
   "accuracy": 0.5834638940321891
 }
