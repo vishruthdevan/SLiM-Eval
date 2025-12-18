@@ -56,16 +56,17 @@ SLiM-Eval is a unified framework for evaluating Large Language Models (LLMs) wit
 
 ### Setup
 
+We recommend using [uv](https://github.com/astral-sh/uv) for fast, reliable Python environment management and installation.
+
 ```bash
+uv venv
+source .venv/bin/activate
+
 # Clone the repository
 git clone https://github.com/vishruthdevan/SLiM-Eval.git
-cd SLiM-Eval
 
 # Install dependencies
-pip install -e ".[all]"
-
-# Optional: Install Jupyter for notebooks
-pip install -e ".[dev]"
+uv pip install -e "SLiM-Eval[all]"
 ```
 
 ## Quick Start
