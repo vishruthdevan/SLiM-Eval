@@ -218,3 +218,5 @@ outputs/analysis/
 
 # Helper scripts
 full_script.sh
+
+.vscode/
