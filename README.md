@@ -9,8 +9,8 @@
 
 - **Team Name**: SLiM-Eval
 - **Members**:
-  - Kavin Aravindhan Rajkumar (kr3131)
   - Vishruth Devan (vd2461)
+  - Kavin Aravindhan Rajkumar (kr3131)
 
 ---
 
