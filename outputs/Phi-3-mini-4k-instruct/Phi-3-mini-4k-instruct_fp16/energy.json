@@ -5,7 +5,7 @@
   "timestamp": "2025-12-09T19:05:37.975184",
   "num_parameters": 3820879872,
   "num_parameters_b": 3.820879872,
-  "size_gb_fp16": 7.116943359375,
+  "model_size_gb": 7.117336504161358,
   "energy_kwh": 0.021426037110346227,
   "energy_joules": 77133.73359724642,
   "duration_seconds": 290.85069036483765,
