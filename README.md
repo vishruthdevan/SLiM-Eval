@@ -110,6 +110,21 @@ slim-eval run --models "meta-llama/Llama-3.2-3B-Instruct" --precision int8 --max
 slim-eval run --models "meta-llama/Llama-3.2-3B-Instruct" --precision int4 --max-model-len 8192
 ```
 
+---
+
+### Troubleshooting: Quantization & CUDA OOM Errors
+
+After quantization completes and metric evaluation starts, you may sometimes encounter a CUDA out-of-memory (OOM) error. This can happen if the GPU memory is over-allocated during evaluation.
+
+- **Recommended Fix:** Reduce the `--gpu-memory-utilization` parameter (e.g., set `--gpu-memory-utilization 0.6` or lower) to ensure there is enough free memory for evaluation.
+- **Quick Fix:** Simply re-run the same command. If quantization has already completed, the quantized model is saved locally and will be loaded directly, so the process will resume from evaluation without repeating quantization.
+
+If quantization fails or the CUDA process crashes, it's possible that partially quantized files remain in the `quantized-models/` directory. To resolve this:
+
+- **Clean Up:** Delete the affected model's directory inside `quantized-models/` to remove any incomplete or corrupted files. Then, re-run your command to trigger a fresh quantization.
+
+---
+
 ### Performance-Only Benchmark
 
 Quick latency and memory profiling (reduced runs for faster results):
