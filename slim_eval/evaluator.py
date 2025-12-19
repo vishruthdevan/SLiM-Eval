@@ -411,7 +411,7 @@ class SLiMEvaluator:
                     # Clear GPU memory after quantization
                     logger.info("Clearing GPU memory after quantization...")
                     clear_cache()
-                    time.sleep(2)  # Give time for memory to be fully released
+                    time.sleep(5)  # Give time for memory to be fully released
 
                     # Check if quantization actually succeeded by verifying config.json exists
                     if (
