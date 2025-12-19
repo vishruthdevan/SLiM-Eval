@@ -573,15 +573,94 @@ If you use SLiM-Eval in your research, please cite:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## Acknowledgments and Citations
 
-Built with:
+We gratefully acknowledge the following open-source projects and model sources that SLiM-Eval depends on. If you use SLiM-Eval or any of these components in your research or deployments, please consider citing them.
 
-- [vLLM](https://github.com/vllm-project/vllm) for efficient LLM inference
-- [llmcompressor](https://github.com/vllm-project/llm-compressor) for quantization
-- [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) for accuracy benchmarks
+### Core Framework
 
----
+### vLLM (Efficient LLM Inference)
+
+For the inference engine used in performance benchmarking:
+
+```bibtex
+@inproceedings{kwon2023efficient,
+  title={Efficient Memory Management for Large Language Model Serving with PagedAttention},
+  author={Woosuk Kwon and Zhuohan Li and Siyuan Zhuang and Ying Sheng and Lianmin Zheng and Cody Hao Yu and Joseph E. Gonzalez and Hao Zhang and Ion Stoica},
+  booktitle={Proceedings of the ACM SIGOPS 29th Symposium on Operating Systems Principles},
+  year={2023}
+}
+```
+
+### llmcompressor (Quantization)
+
+For model quantization and compression support:
+
+```bibtex
+@software{llmcompressor2024,
+  title={{LLM Compressor}},
+  author={Red Hat AI and vLLM Project},
+  year={2024},
+  month={8},
+  url={https://github.com/vllm-project/llm-compressor}
+}
+```
+
+### lm-evaluation-harness (Accuracy Benchmarking)
+
+For language model accuracy evaluation:
+
+```bibtex
+@misc{eval-harness,
+  author       = {Gao, Leo and Tow, Jonathan and Abbasi, Baber and Biderman, Stella and Black, Sid and DiPofi, Anthony and Foster, Charles and Golding, Laurence and Hsu, Jeffrey and Le Noac'h, Alain and Li, Haonan and McDonell, Kyle and Muennighoff, Niklas and Ociepa, Chris and Phang, Jason and Reynolds, Laria and Schoelkopf, Hailey and Skowron, Aviya and Sutawika, Lintang and Tang, Eric and Thite, Anish and Wang, Ben and Wang, Kevin and Zou, Andy},
+  title        = {The Language Model Evaluation Harness},
+  month        = {07},
+  year         = {2024},
+  publisher    = {Zenodo},
+  version      = {v0.4.3},
+  doi          = {10.5281/zenodo.12608602},
+  url          = {https://zenodo.org/records/12608602}
+}
+```
+
+### Models
+
+```bibtex
+@misc{qwen2.5-3b,
+  title        = {Qwen2.5-3B-Instruct},
+  howpublished = {Hugging Face model},
+  url          = {https://huggingface.co/Qwen/Qwen2.5-3B-Instruct},
+  year         = {2025}
+}
+
+@misc{llama3.2-3b,
+  title        = {Llama-3.2-3B-Instruct},
+  howpublished = {Hugging Face model},
+  url          = {https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct},
+  year         = {2025}
+}
+
+@misc{phi3-mini-4k,
+  title        = {Phi-3-mini-4k-instruct},
+  howpublished = {Hugging Face model},
+  url          = {https://huggingface.co/microsoft/phi-3-mini-4k-instruct},
+  year         = {2025}
+}
+
+@misc{gemma3-4b,
+  title        = {Gemma-3-4B-it},
+  howpublished = {Hugging Face model},
+  url          = {https://huggingface.co/gemma-ai/Gemma-3-4B-it},
+  year         = {2025}
+}
+
+@misc{mistral7b,
+  title        = {Mistral-7B-Instruct-v0.3},
+  howpublished = {Hugging Face model},
+  url          = {https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3},
+  year         = {2025}
+}
+```
 
 **Maintained by**: [@vishruthdevan](https://github.com/vishruthdevan) and [@KavinAravindhan](https://github.com/KavinAravindhan)
 **Issues**: [GitHub Issues](https://github.com/vishruthdevan/SLiM-Eval/issues)
