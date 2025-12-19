@@ -3,7 +3,7 @@
     "packages": {
         ".": {
             "release-type": "python",
-            "pull-request-title-pattern": "chore(slim-eval): release v${version} [SUB-28072]",
+            "pull-request-title-pattern": "chore(slim-eval): release v${version}",
             "changelog-sections": [
                 {
                     "type": "feat",
