@@ -10,8 +10,8 @@
 
 - **Team Name**: SLiM-Eval
 - **Members**:
-  - Kavin Aravindhan Rajkumar (kr3131)
   - Vishruth Devan (vd2461)
+  - Kavin Aravindhan Rajkumar (kr3131)
 
 ---
 
@@ -62,12 +62,7 @@ We recommend using [uv](https://github.com/astral-sh/uv) for fast, reliable Pyth
 ```bash
 uv venv
 source .venv/bin/activate
-
-# Clone the repository
-git clone https://github.com/vishruthdevan/SLiM-Eval.git
-
-# Install dependencies
-uv pip install -e "SLiM-Eval[all]"
+uv pip install "slim-eval[all]"
 ```
 
 ## Quick Start
@@ -562,7 +557,7 @@ If you use SLiM-Eval in your research, please cite:
 
 ```bibtex
 @software{slim_eval2025,
-  author = {Rajkumar, Kavin Aravindhan and Devan, Vishruth},
+  author = {Devan, Vishruth and Rajkumar, Kavin Aravindhan},
   title = {SLiM-Eval: Small Language Model Evaluation Framework},
   year = {2025},
   url = {https://github.com/vishruthdevan/SLiM-Eval}
