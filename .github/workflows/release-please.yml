@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'pyproject.toml'
-      - 'slim_eval/**'
 
 permissions:
   contents: write
@@ -21,5 +18,5 @@ jobs:
       - name: release-please-action
         uses: googleapis/release-please-action@v4.4.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          release-type: python
+          token: ${{ secrets.RELEASE_TOKEN }}
+          config-file: release-please-config.json

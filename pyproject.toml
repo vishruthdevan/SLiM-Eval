@@ -1,6 +1,6 @@
 [project]
 name = "slim-eval"
-version = "0.1.0"
+version = "0.1.2"
 description = "Complete Small Language Model Evaluation Framework - Tracking Latency, Memory, Energy, and Accuracy"
 readme = "README.md"
 requires-python = ">=3.10"
