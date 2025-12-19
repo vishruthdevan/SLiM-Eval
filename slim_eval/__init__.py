@@ -1,6 +1,6 @@
 """SLiM-Eval: Systematic LLM quantization benchmarking."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 from .analysis import ResultsAnalyzer
 
