@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.4](https://github.com/vishruthdevan/SLiM-Eval/compare/v0.1.3...v0.1.4) (2026-09-02)
+
+
+### 🐛 Bug Fixes
+
+* update workflows and versioning for automated releases ([ad10922](https://github.com/vishruthdevan/SLiM-Eval/commit/ad10922d24e753f5815b9e7bc36511d9c6490ae4))
+
+
+### 🧹 Chores
+
+* comment out PyPI publishing steps in workflow ([63fc8a8](https://github.com/vishruthdevan/SLiM-Eval/commit/63fc8a8dbd1d412c2d47a0feff372c6189a5282d))
+* initial release ([00cc86b](https://github.com/vishruthdevan/SLiM-Eval/commit/00cc86b4ea707ec286304ef29f205a163e7b0033))
+* **slim-eval:** release v0.1.3 ([#8](https://github.com/vishruthdevan/SLiM-Eval/issues/8)) ([ee91d5a](https://github.com/vishruthdevan/SLiM-Eval/commit/ee91d5ab5e74f7aecbc4b80503629f3ea2246df4))
+* update .gitignore and remove unused VSCode settings ([720884f](https://github.com/vishruthdevan/SLiM-Eval/commit/720884f283b676bcc800f2d671a8f6fc1c067b01))
+* update SLiM_Eval.pdf with latest revisions ([1604d9b](https://github.com/vishruthdevan/SLiM-Eval/commit/1604d9bbea109b6e7b9596e8f324e3b83aef9495))
+
 ## [0.1.3](https://github.com/vishruthdevan/SLiM-Eval/compare/v0.1.2...v0.1.3) (2025-12-19)
 
 
